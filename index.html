@@ -2846,7 +2846,27 @@ function aplicarPermissoes(){
   esconder('b-add-cli',pode('lancar'));
 }
 
+/* Dados reais criptografados (dados/cometa.enc). Só quem tem o link com a chave
+   (#dados=...) consegue abrir; a chave nunca vai para o servidor (fica depois do #). */
+function b64(t){t=t.replace(/-/g,'+').replace(/_/g,'/');return Uint8Array.from(atob(t+'==='.slice((t.length+3)%4)),c=>c.charCodeAt(0))}
+async function abrirCifrado(k){
+  const r=await fetch('dados/cometa.enc',{cache:'no-store'});
+  if(!r.ok)throw new Error('arquivo não encontrado');
+  const {iv,dados:cif}=await r.json();
+  const chave=await crypto.subtle.importKey('raw',b64(k),'AES-GCM',false,['decrypt']);
+  const claro=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(iv)},chave,b64(cif));
+  return JSON.parse(new TextDecoder().decode(claro));
+}
 async function abrirSistema(){
+  const kDados=(location.hash.match(/dados=([A-Za-z0-9_-]+)/)||[])[1];
+  if(!naNuvem&&kDados){
+    try{
+      const d=await abrirCifrado(kDados);
+      localSet({...d,postagens:d.postagens||[],materiais:d.materiais||[],alertas:d.alertas||[]});
+      setTimeout(()=>aviso('Dados da Cometa carregados ('+d.clientes.length+' clientes)'),900);
+    }catch(e){console.error(e);setTimeout(()=>aviso('Não consegui abrir os dados: o link está incompleto?'),900)}
+    history.replaceState(null,'',location.pathname+location.search);
+  }
   const s=await carregar();
   const offline=!!s?._offline;
   if(s)delete s._offline;
