@@ -1,0 +1,12 @@
+{
+  "name": "cometa-testes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.16",
+    "playwright-core": "^1.64.1"
+  }
+}

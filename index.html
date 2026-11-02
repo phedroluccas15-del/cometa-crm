@@ -1,0 +1,2064 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cometa OS — Controle de clientes</title>
+<meta name="theme-color" content="#0F1330">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-192.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ==========================================================
+   CONFIGURAÇÃO — preencha com os dados do seu projeto Supabase
+   (Project Settings › API). Enquanto ficar em branco, o sistema
+   funciona salvando só no próprio aparelho.
+   ========================================================== */
+const SUPABASE_URL = '';   /* ex.: 'https://abcdxyz.supabase.co' */
+const SUPABASE_KEY = '';   /* chave "anon public" ou "publishable" */
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --noite:#0F1330;
+  --noite-2:#1B2154;
+  --gelo:#F3F4FA;
+  --branco:#FFFFFF;
+  --linha:#E1E4F0;
+  --ink:#161B3D;
+  --suave:#666E96;
+  --cometa:#4B3BE4;
+  --rastro:#FFB020;
+  --ok:#0E9F6E;
+  --atraso:#E5484D;
+  --r:16px;
+  --sombra:0 1px 2px rgba(16,20,60,.04), 0 12px 28px -20px rgba(16,20,60,.45);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--gelo);color:var(--ink);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+:focus-visible{outline:2.5px solid var(--cometa);outline-offset:2px;border-radius:8px}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;margin:0}
+.mono{font-family:'IBM Plex Mono',monospace}
+
+/* ===== casca ===== */
+.app{display:flex;min-height:100vh}
+.lateral{
+  width:236px;flex:none;background:var(--noite);color:#fff;
+  padding:20px 14px;position:sticky;top:0;height:100vh;
+  display:flex;flex-direction:column;gap:4px;
+}
+.marca{display:flex;align-items:center;gap:10px;padding:0 8px 20px}
+.risco{width:28px;height:8px;border-radius:99px;background:linear-gradient(90deg,rgba(255,176,32,0) 0%,var(--rastro) 55%,#fff 100%);flex:none}
+.marca h1{font-size:18px;font-weight:800}
+.marca span{display:block;font-size:11px;color:#8A92C6;letter-spacing:.04em;font-family:'IBM Plex Mono',monospace}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav button{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:11px 12px;border-radius:11px;color:#B9BFE4;font-size:14px;font-weight:500;text-align:left;width:100%;
+}
+.nav button:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav button[aria-current="true"]{background:var(--cometa);color:#fff}
+.nav .pip{font-family:'IBM Plex Mono',monospace;font-size:11px;background:rgba(255,255,255,.16);border-radius:99px;padding:1px 7px}
+.pip.alerta{background:var(--atraso)!important;color:#fff!important}
+.lateral .rodape{margin-top:auto;padding:0 8px;font-size:11px;color:#6C74A8;font-family:'IBM Plex Mono',monospace}
+
+.conteudo{flex:1;min-width:0;padding:26px 30px 40px;max-width:1180px}
+.cabeca{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+.cabeca h2{font-size:30px;font-weight:800}
+.cabeca p{margin:3px 0 0;color:var(--suave);font-size:14px}
+
+/* ===== barra inferior mobile ===== */
+.barra{display:none}
+@media(max-width:860px){
+  .lateral{display:none}
+  .conteudo{padding:18px 14px 110px}
+  .cabeca h2{font-size:24px}
+  .barra{
+    display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;
+    position:fixed;left:0;right:0;bottom:0;z-index:60;
+    background:rgba(255,255,255,.94);backdrop-filter:blur(14px);
+    border-top:1px solid var(--linha);padding:7px 6px calc(7px + env(safe-area-inset-bottom));
+  }
+  .barra::-webkit-scrollbar{display:none}
+  .barra button{flex:0 0 auto;min-width:64px;padding:8px 9px;border-radius:10px;font-size:10.5px;font-weight:600;color:var(--suave);text-align:center;letter-spacing:-.01em}
+  .barra .pip{font-family:'IBM Plex Mono',monospace;font-size:9.5px;background:#EEF0F9;color:var(--suave);border-radius:99px;padding:1px 6px;margin-left:3px}
+  .barra button[aria-current="true"]{background:var(--noite);color:#fff}
+  .topo-mob{display:flex;align-items:center;gap:9px;margin-bottom:14px}
+  .topo-mob h1{font-size:17px;font-weight:800}
+}
+.topo-mob{display:none}
+
+/* ===== cartões e blocos ===== */
+.grade{display:grid;gap:12px}
+.kpis{grid-template-columns:repeat(4,1fr)}
+@media(max-width:860px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:14px 15px;box-shadow:var(--sombra)}
+.kpi .rot{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;color:var(--suave)}
+.kpi .num{font-family:'Bricolage Grotesque',sans-serif;font-size:30px;font-weight:800;line-height:1.1;margin-top:5px}
+.kpi.alerta .num{color:var(--atraso)}
+.kpi.verde .num{color:var(--ok)}
+.kpi .pe{font-size:12px;color:var(--suave);margin-top:2px}
+
+.rotulo{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin:26px 0 10px;display:flex;align-items:center;gap:8px}
+.rotulo::after{content:"";flex:1;height:1px;background:var(--linha)}
+
+.painel{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);box-shadow:var(--sombra);overflow:hidden}
+.item{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--linha)}
+.item:last-child{border-bottom:none}
+.item.saindo{animation:cometa .42s ease forwards}
+@keyframes cometa{30%{transform:translateX(-8px)}100%{transform:translateX(115%);opacity:0;height:0;padding:0;border:0}}
+.item .corpo{flex:1;min-width:0}
+.item .tit{font-weight:600;font-size:14.5px}
+.item .sub{font-size:12.5px;color:var(--suave);margin-top:2px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dono{font-weight:600;color:var(--ink)}
+
+.tag{font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:7px;background:#EEF0F9;color:var(--suave);white-space:nowrap}
+.tag.hoje{background:#EDEAFD;color:var(--cometa)}
+.tag.amanha{background:#FFF3DC;color:#8A6410}
+.tag.atraso{background:#FDECEC;color:var(--atraso)}
+.tag.alta{background:#FDECEC;color:var(--atraso)}
+.tag.rec{background:#E6F6F0;color:var(--ok)}
+.tag.pausado{background:#F0F0F4;color:var(--suave)}
+
+.ok{flex:none;background:var(--ok);color:#fff;font-weight:600;font-size:13px;padding:8px 14px;border-radius:10px}
+.ok:active{transform:scale(.95)}
+.mini{flex:none;font-size:12px;font-weight:600;color:var(--suave);padding:6px 9px;border-radius:9px;border:1px solid var(--linha);background:var(--branco)}
+.mini:hover{color:var(--ink)}
+.mini.perigo:hover{color:var(--atraso);border-color:#F3C6C7}
+
+/* ===== clientes ===== */
+.filtros{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+.f{padding:7px 13px;border-radius:99px;border:1px solid var(--linha);background:var(--branco);font-size:13px;font-weight:500;color:var(--suave)}
+.f[aria-pressed="true"]{background:var(--noite);color:#fff;border-color:var(--noite)}
+.busca{width:100%;max-width:320px;padding:11px 14px;border-radius:12px;border:1px solid var(--linha);background:var(--branco)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:12px}
+.cli{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:15px;box-shadow:var(--sombra);text-align:left;width:100%;transition:transform .12s ease,border-color .12s}
+.cli:hover{border-color:#C8CDE8}
+.cli:active{transform:scale(.99)}
+.cli-topo{display:flex;align-items:center;gap:12px}
+.anel{width:46px;height:46px;flex:none;position:relative}
+.anel svg{transform:rotate(-90deg)}
+.anel span{position:absolute;inset:0;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600}
+.cli h3{font-size:17px;font-weight:700}
+.cli .meta{font-size:12.5px;color:var(--suave);margin-top:1px}
+.cli .pend{margin-top:11px;display:flex;flex-direction:column;gap:5px}
+.pl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--suave)}
+.bola{width:7px;height:7px;border-radius:99px;background:var(--cometa);flex:none}
+.bola.amanha{background:var(--rastro)}.bola.atraso{background:var(--atraso)}
+.limpo{margin-top:10px;font-size:13px;color:var(--ok);font-weight:500}
+
+/* ===== ficha ===== */
+.voltar{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:600;color:var(--suave);margin-bottom:10px}
+.ficha-topo{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+.acoes{display:flex;gap:8px;flex-wrap:wrap}
+.linha-tempo{position:relative;padding-left:22px}
+.linha-tempo::before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:2px;background:var(--linha)}
+.lt{position:relative;padding:9px 0}
+.lt::before{content:"";position:absolute;left:-22px;top:15px;width:10px;height:10px;border-radius:99px;background:var(--ok);border:2px solid var(--gelo)}
+.lt .q{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave);margin-top:2px}
+
+/* ===== formulários / modal ===== */
+.campo{margin-bottom:13px}
+.campo label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+.campo input,.campo select,.campo textarea{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--linha);background:var(--branco)}
+.campo textarea{min-height:62px;resize:vertical}
+.dupla{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:9px}
+.chip{padding:7px 12px;border-radius:99px;border:1px solid var(--linha);background:var(--branco);font-size:13px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--noite);color:#fff;border-color:var(--noite)}
+.btn{width:100%;background:var(--cometa);color:#fff;font-weight:600;font-size:15px;padding:13px;border-radius:13px}
+.btn.sec{background:var(--branco);color:var(--ink);border:1px solid var(--linha)}
+.btn.esc{background:var(--noite)}
+.btn:active{transform:scale(.99)}
+.fila-item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--branco);border:1px dashed var(--linha);border-radius:12px;padding:10px 13px;margin-bottom:7px;font-size:14px}
+.form-box{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:18px;box-shadow:var(--sombra);max-width:620px}
+
+.fundo{position:fixed;inset:0;background:rgba(15,19,48,.55);backdrop-filter:blur(3px);display:none;place-items:center;z-index:80;padding:16px}
+.fundo.ver{display:grid}
+.modal{background:var(--branco);border-radius:20px;padding:20px;width:100%;max-width:440px;max-height:88vh;overflow:auto}
+.modal h3{font-size:20px;font-weight:700;margin-bottom:14px}
+
+.nada{text-align:center;color:var(--suave);font-size:14px;padding:34px 18px;border:1px dashed var(--linha);border-radius:var(--r)}
+.nada b{display:block;color:var(--ink);font-family:'Bricolage Grotesque',sans-serif;font-size:16px;margin-bottom:4px}
+.aviso{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--noite);color:#fff;padding:12px 17px;border-radius:13px;font-size:13.5px;display:flex;gap:14px;align-items:center;opacity:0;pointer-events:none;transition:.22s;z-index:90;max-width:92vw;box-shadow:0 16px 34px -14px rgba(0,0,0,.55)}
+.aviso.ver{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto}
+.aviso button{color:var(--rastro);font-weight:600}
+@media(max-width:860px){.aviso{bottom:88px}}
+.tela{display:none}.tela.ativa{display:block;animation:sobe .2s ease both}
+
+/* ===== login ===== */
+.porta{position:fixed;inset:0;background:var(--noite);display:none;place-items:center;z-index:100;padding:20px}
+.porta.ver{display:grid}
+.porta-card{width:100%;max-width:370px;background:var(--branco);border-radius:22px;padding:26px}
+.porta-card .marca{padding:0 0 18px}
+.porta-card h1{color:var(--ink)}
+.porta-card .erro{color:var(--atraso);font-size:13px;min-height:18px;margin-top:8px}
+
+/* ===== sincronismo ===== */
+.sync{
+  position:fixed;top:12px;right:14px;z-index:70;
+  font-family:'IBM Plex Mono',monospace;font-size:10.5px;font-weight:600;
+  padding:5px 11px;border-radius:99px;background:var(--branco);
+  border:1px solid var(--linha);color:var(--suave);box-shadow:var(--sombra);
+  display:flex;align-items:center;gap:6px;opacity:0;transition:.25s
+}
+.sync.ver{opacity:1}
+.sync i{width:7px;height:7px;border-radius:99px;background:var(--ok);display:block}
+.sync.salvando i{background:var(--rastro)}
+.sync.local i{background:var(--suave)}
+@media(max-width:860px){.sync{top:auto;bottom:82px;right:10px}}
+@keyframes sobe{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== anúncios (Meta) na ficha ===== */
+.meta-topo{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:12px}
+.meta-topo .chips{margin:0}
+.meta-alertas{margin:12px 0 0;display:flex;flex-direction:column;gap:6px}
+.meta-alerta{background:#FDECEC;color:#9B1C20;border-radius:11px;padding:9px 12px;font-size:13px}
+.meta-campanha .tit{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.meta-campanha .num{font-family:'IBM Plex Mono',monospace;font-size:12px}
+.meta-conj{background:#F8F9FD;padding-left:30px}
+.posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.post{background:var(--branco);border:1px solid var(--linha);border-radius:14px;overflow:hidden;text-decoration:none;color:inherit;box-shadow:var(--sombra)}
+.post .img{aspect-ratio:1;background:#E9EBF5 center/cover no-repeat}
+.post .info{padding:8px 10px;font-size:12px;color:var(--suave)}
+.post .info p{margin:3px 0 0;color:var(--ink);font-size:12.5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.carregando{color:var(--suave);font-size:13.5px;padding:18px;text-align:center}
+.lista-escolha{max-height:230px;overflow:auto;border:1px solid var(--linha);border-radius:12px}
+.lista-escolha label{display:flex;gap:9px;align-items:flex-start;padding:9px 12px;border-bottom:1px solid var(--linha);font-size:14px;font-weight:400;margin:0;cursor:pointer}
+.lista-escolha label:last-child{border-bottom:none}
+.lista-escolha input{width:auto;margin-top:3px}
+.lista-escolha small{display:block;color:var(--suave);font-size:12px}
+
+/* ===== Cometinha ===== */
+.ct-bt{position:fixed;right:22px;bottom:22px;z-index:75;width:58px;height:58px;border-radius:99px;
+  background:var(--noite);color:#fff;display:none;place-items:center;box-shadow:0 14px 30px -12px rgba(15,19,48,.7)}
+.ct-bt.ver{display:grid}
+.ct-bt svg{width:30px;height:30px}
+.ct-bt:active{transform:scale(.94)}
+.ct{position:fixed;right:22px;bottom:92px;z-index:76;width:390px;max-width:calc(100vw - 24px);height:min(620px,calc(100vh - 120px));
+  background:var(--branco);border:1px solid var(--linha);border-radius:22px;box-shadow:0 24px 60px -24px rgba(15,19,48,.55);
+  display:none;flex-direction:column;overflow:hidden}
+.ct.ver{display:flex;animation:sobe .18s ease both}
+.ct-topo{display:flex;align-items:center;gap:10px;padding:13px 14px;background:var(--noite);color:#fff}
+.ct-topo b{font-family:'Bricolage Grotesque',sans-serif;font-size:17px}
+.ct-topo span{font-size:11px;color:#8A92C6;font-family:'IBM Plex Mono',monospace}
+.ct-topo .esp{flex:1}
+.ct-topo button{color:#B9BFE4;font-size:12px;font-weight:600;padding:5px 8px;border-radius:8px}
+.ct-topo button:hover{background:rgba(255,255,255,.08);color:#fff}
+.ct-msgs{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:9px;background:var(--gelo)}
+.ct-m{max-width:86%;padding:9px 12px;border-radius:15px;font-size:14px;line-height:1.45;white-space:normal;word-wrap:break-word}
+.ct-m.eu{align-self:flex-end;background:var(--cometa);color:#fff;border-bottom-right-radius:5px}
+.ct-m.ele{align-self:flex-start;background:var(--branco);border:1px solid var(--linha);border-bottom-left-radius:5px}
+.ct-m.erro{align-self:center;background:#FDECEC;color:#9B1C20;font-size:13px}
+.ct-m .audio{font-size:11px;opacity:.8;display:block;margin-bottom:2px;font-family:'IBM Plex Mono',monospace}
+.ct-pensando{align-self:flex-start;color:var(--suave);font-size:13px;padding:4px 6px}
+.ct-pensando i{display:inline-block;width:6px;height:6px;border-radius:99px;background:var(--suave);margin-right:3px;animation:pisca 1s infinite}
+.ct-pensando i:nth-child(2){animation-delay:.2s}.ct-pensando i:nth-child(3){animation-delay:.4s}
+@keyframes pisca{0%,100%{opacity:.25}50%{opacity:1}}
+.ct-entrada{display:flex;gap:7px;align-items:flex-end;padding:10px;border-top:1px solid var(--linha)}
+.ct-entrada textarea{flex:1;resize:none;max-height:120px;min-height:42px;padding:10px 12px;border-radius:13px;border:1px solid var(--linha);font-size:14px}
+.ct-entrada button{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--gelo);color:var(--ink)}
+.ct-entrada button svg{width:20px;height:20px}
+.ct-entrada #ct-enviar{background:var(--cometa);color:#fff}
+.ct-entrada #ct-mic.gravando{background:var(--atraso);color:#fff;animation:pisca 1.2s infinite}
+.ct-rodape{display:flex;justify-content:space-between;align-items:center;padding:0 12px 10px;font-size:11.5px;color:var(--suave)}
+.ct-rodape label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.ct-rodape input{width:auto}
+.conteudo{padding-bottom:100px}
+@media(max-width:860px){
+  #f-meta .kpi .num{font-size:22px}
+  #f-meta .kpi .rot{font-size:9.5px}
+  .ct-bt{bottom:calc(84px + env(safe-area-inset-bottom));right:14px;width:52px;height:52px}
+  .ct{left:8px;right:8px;width:auto;max-width:none;top:10px;bottom:calc(78px + env(safe-area-inset-bottom));height:auto}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="lateral">
+    <div class="marca"><span class="risco"></span><div><h1>Cometa OS</h1><span>controle de clientes</span></div></div>
+    <div class="nav" id="nav"></div>
+    <div class="rodape" id="rodape"></div>
+  </aside>
+
+  <div class="conteudo">
+    <div class="topo-mob"><span class="risco"></span><h1>Cometa OS</h1></div>
+
+    <!-- VISÃO GERAL -->
+    <section class="tela ativa" id="t-geral">
+      <div class="cabeca"><div><h2>Visão geral</h2><p id="sub-geral"></p></div></div>
+      <div class="grade kpis" id="kpis"></div>
+      <div class="rotulo">Atrasado</div><div id="bl-atraso"></div>
+      <div class="rotulo">Para hoje</div><div id="bl-hoje"></div>
+      <div class="rotulo">Amanhã</div><div id="bl-amanha"></div>
+      <div class="rotulo">Entregue nos últimos 7 dias</div><div id="bl-recentes"></div>
+    </section>
+
+    <!-- CLIENTES -->
+    <section class="tela" id="t-clientes">
+      <div class="cabeca">
+        <div><h2>Clientes</h2><p>Ordem alfabética · o anel mostra o quanto do mês já foi entregue</p></div>
+        <button class="mini" id="b-novo-cli">+ Novo cliente</button>
+      </div>
+      <input class="busca" id="busca" placeholder="Buscar cliente" autocomplete="off" style="margin-bottom:12px">
+      <div class="filtros" id="filtros">
+        <button class="f" data-f="todos" aria-pressed="true">Todos</button>
+        <button class="f" data-f="atraso" aria-pressed="false">Com atraso</button>
+        <button class="f" data-f="pend" aria-pressed="false">Com pendência</button>
+        <button class="f" data-f="livre" aria-pressed="false">Em dia</button>
+        <button class="f" data-f="pausado" aria-pressed="false">Pausados</button>
+      </div>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <!-- FICHA -->
+    <section class="tela" id="t-ficha">
+      <button class="voltar" id="b-voltar">← Todos os clientes</button>
+      <div class="ficha-topo">
+        <div><h2 id="f-nome" style="font-size:30px;font-weight:800"></h2><p id="f-sub" style="color:var(--suave);font-size:14px;margin:3px 0 0"></p></div>
+        <div class="acoes">
+          <button class="mini" id="b-add-cli">+ Atividade</button>
+          <button class="mini" id="b-zap">Enviar status no WhatsApp</button>
+          <button class="mini" id="b-relat">Relatório do mês</button>
+          <button class="mini" id="b-edit-cli">Editar cadastro</button>
+        </div>
+      </div>
+      <div class="rotulo">Em aberto</div><div id="f-pend"></div>
+      <div id="f-meta-caixa"><div class="rotulo">Anúncios · Meta</div><div id="f-meta"></div></div>
+      <div class="rotulo">Histórico de entregas</div><div class="linha-tempo" id="f-hist"></div>
+    </section>
+
+    <!-- MINHAS -->
+    <section class="tela" id="t-minhas">
+      <div class="cabeca"><div><h2 id="minhas-tit">Minhas tarefas</h2><p id="minhas-sub"></p></div></div>
+      <div class="rotulo">Compromissos marcados</div><div id="minhas-comp"></div>
+      <div class="rotulo">Atividades para você</div><div id="minhas-ativ"></div>
+      <div class="rotulo">Concluído nos últimos 7 dias</div><div id="minhas-feitas"></div>
+    </section>
+
+    <!-- AGENDA EXTERNA -->
+    <section class="tela" id="t-externa">
+      <div class="cabeca">
+        <div><h2>Agenda externa</h2><p>Captações, reuniões e visitas — com horário e endereço</p></div>
+        <button class="mini" id="b-novo-comp">+ Novo compromisso</button>
+      </div>
+      <div id="externa-lista"></div>
+      <div class="rotulo">Já realizados</div><div id="externa-feitos"></div>
+    </section>
+
+    <!-- AGENDA -->
+    <section class="tela" id="t-agenda">
+      <div class="cabeca"><div><h2>Agenda</h2><p>Próximos 14 dias, por data marcada</p></div></div>
+      <div id="agenda"></div>
+      <div class="rotulo">Sem data definida</div><div id="sem-data"></div>
+    </section>
+
+    <!-- LANÇAR -->
+    <section class="tela" id="t-lancar">
+      <div class="cabeca"><div><h2>Lançar atividade</h2><p>Monte a lista e salve tudo de uma vez</p></div></div>
+      <div class="form-box">
+        <div class="campo"><label for="sel-cli">Cliente</label><select id="sel-cli"></select></div>
+        <div class="campo">
+          <label>Serviço</label>
+          <div class="chips" id="chips"></div>
+          <input id="in-tit" placeholder="Ou escreva o serviço" autocomplete="off">
+        </div>
+        <div class="dupla">
+          <div class="campo"><label for="in-data">Data</label><input type="date" id="in-data"></div>
+          <div class="campo"><label for="in-prio">Prioridade</label>
+            <select id="in-prio"><option value="normal">Normal</option><option value="alta">Alta</option></select></div>
+        </div>
+        <div class="chips" id="datas-rapidas" style="margin-top:-4px">
+          <button class="chip" data-dia="0">Hoje</button>
+          <button class="chip" data-dia="1">Amanhã</button>
+          <button class="chip" data-dia="7">Em 7 dias</button>
+          <button class="chip" data-dia="x">Sem data</button>
+        </div>
+        <div class="dupla">
+          <div class="campo"><label for="in-resp">Responsável</label><select id="in-resp"></select></div>
+          <div class="campo"><label for="in-rec">Repetir</label>
+            <select id="in-rec">
+              <option value="">Não repete</option>
+              <option value="1">Todo dia</option>
+              <option value="7">Toda semana</option>
+              <option value="14">A cada 15 dias</option>
+              <option value="30">Todo mês</option>
+            </select></div>
+        </div>
+        <div class="campo"><label for="in-obs">Observação</label><textarea id="in-obs" placeholder="Ex.: gravar na loja, cliente manda o roteiro"></textarea></div>
+        <button class="btn sec" id="b-fila">Adicionar à lista</button>
+        <div id="fila" style="margin-top:10px"></div>
+        <button class="btn" id="b-salvar" style="margin-top:8px">Salvar atividades</button>
+      </div>
+    </section>
+
+    <!-- FINANCEIRO -->
+    <section class="tela" id="t-financeiro">
+      <div class="cabeca">
+        <div><h2>Financeiro</h2><p id="fin-sub"></p></div>
+        <div class="acoes"><button class="mini" id="b-mes-ant">←</button><button class="mini" id="b-mes-prox">→</button></div>
+      </div>
+      <div class="grade kpis" id="fin-kpis"></div>
+      <div id="fin-vencidos"></div>
+      <div id="fin-dias"></div>
+    </section>
+
+    <!-- EQUIPE -->
+    <section class="tela" id="t-equipe">
+      <div class="cabeca">
+        <div><h2>Equipe</h2><p>Quem entra no sistema e o que cada um pode fazer</p></div>
+        <button class="mini" id="b-novo-user">+ Novo acesso</button>
+      </div>
+      <div id="lista-equipe"></div>
+    </section>
+
+    <!-- HISTÓRICO -->
+    <section class="tela" id="t-historico">
+      <div class="cabeca"><div><h2>Histórico</h2><p>Quem fez o quê, mais recente primeiro</p></div></div>
+      <div id="lista-log"></div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section class="tela" id="t-ajustes">
+      <div class="cabeca"><div><h2>Ajustes</h2><p>Equipe, serviços e cópia de segurança</p></div></div>
+      <div class="form-box">
+        <div class="campo"><label>Equipe (separe por vírgula)</label><input id="in-equipe"></div>
+        <div class="campo"><label>Serviços do atalho (separe por vírgula)</label><input id="in-servicos"></div>
+        <button class="btn sec" id="b-salvar-aj">Salvar ajustes</button>
+        <div class="rotulo">Cópia de segurança</div>
+        <div class="dupla">
+          <button class="btn sec" id="b-exportar">Baixar backup</button>
+          <button class="btn sec" id="b-importar">Restaurar backup</button>
+        </div>
+        <input type="file" id="arquivo" accept="application/json" hidden>
+        <div class="rotulo">Acesso</div>
+        <button class="btn sec" id="b-sair">Sair da conta</button>
+        <p style="font-size:12.5px;color:var(--suave);margin-top:12px" id="nota-nuvem"></p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<nav class="barra" id="barra"></nav>
+
+<div class="porta" id="porta">
+  <div class="porta-card">
+    <div class="marca"><span class="risco"></span><div><h1>Cometa OS</h1><span style="color:var(--suave)">controle de clientes</span></div></div>
+    <div class="campo"><label for="p-email">E-mail</label><input id="p-email" type="email" autocomplete="username"></div>
+    <div class="campo"><label for="p-senha">Senha</label><input id="p-senha" type="password" autocomplete="current-password"></div>
+    <button class="btn" id="p-entrar">Entrar</button>
+    <div class="erro" id="p-erro"></div>
+    <div id="p-bloqueado" style="display:none">
+      <p style="font-size:14px;color:var(--suave);margin:14px 0">Sua conta existe, mas ainda não tem acesso liberado. Peça para o administrador liberar você em <b>Equipe</b>.</p>
+      <button class="btn sec" id="p-sair">Sair</button>
+    </div>
+  </div>
+</div>
+<div class="sync" id="sync"><i></i><span id="sync-txt">salvo</span></div>
+
+<button class="ct-bt" id="ct-bt" aria-label="Falar com o Cometinha" title="Cometinha">
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+    <path d="M3 25 L15 13" stroke="#FFB020" stroke-width="3" stroke-linecap="round" opacity=".55"/>
+    <path d="M6 28 L16 18" stroke="#FFB020" stroke-width="2" stroke-linecap="round" opacity=".35"/>
+    <circle cx="20" cy="12" r="7" fill="#fff"/>
+    <circle cx="17.6" cy="11.4" r="1.2" fill="#0F1330"/><circle cx="22.4" cy="11.4" r="1.2" fill="#0F1330"/>
+    <path d="M17.6 14.4 Q20 16.4 22.4 14.4" stroke="#0F1330" stroke-width="1.3" stroke-linecap="round" fill="none"/>
+  </svg>
+</button>
+<section class="ct" id="ct" aria-label="Cometinha">
+  <div class="ct-topo">
+    <div><b>Cometinha</b><br><span>assistente da Cometa</span></div>
+    <div class="esp"></div>
+    <button id="ct-nova" title="Começar uma conversa nova">nova conversa</button>
+    <button id="ct-fechar" aria-label="Fechar">✕</button>
+  </div>
+  <div class="ct-msgs" id="ct-msgs"></div>
+  <div class="ct-entrada">
+    <textarea id="ct-texto" rows="1" placeholder="Pergunte ou peça algo…"></textarea>
+    <button id="ct-mic" aria-label="Gravar áudio" title="Toque para falar, toque de novo para enviar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+    </button>
+    <button id="ct-enviar" aria-label="Enviar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"/></svg>
+    </button>
+  </div>
+  <div class="ct-rodape">
+    <label><input type="checkbox" id="ct-falar"> ler as respostas em voz alta</label>
+    <span id="ct-status"></span>
+  </div>
+</section>
+
+<div class="fundo" id="fundo"><div class="modal" id="modal"></div></div>
+<div class="aviso" id="aviso"><span id="aviso-txt"></span><button id="aviso-btn" hidden>Desfazer</button></div>
+
+<script>
+/* ============ ARMAZENAMENTO ============
+   Com SUPABASE_URL preenchido, tudo fica na nuvem e sincroniza
+   entre celular e computador. Sem isso, salva só neste aparelho. */
+const CHAVE='cometa-os:v2';
+/* ?local=1 no endereço força o modo "só neste aparelho" (para testar sem mexer na nuvem) */
+const FORCAR_LOCAL=new URLSearchParams(location.search).has('local');
+let sb=null,naNuvem=false,filaSalvar=null,canal=null;
+
+try{
+  if(!FORCAR_LOCAL&&SUPABASE_URL&&SUPABASE_KEY&&window.supabase){
+    sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    naNuvem=true;
+  }
+}catch(e){console.warn('Supabase indisponível:',e)}
+
+function sinal(estado,txt){
+  const el=document.getElementById('sync');
+  el.className='sync ver '+estado;
+  document.getElementById('sync-txt').textContent=txt;
+  if(estado==='ok'){clearTimeout(sinal.t);sinal.t=setTimeout(()=>el.classList.remove('ver'),1800)}
+}
+function localGet(){try{const v=localStorage.getItem(CHAVE);return v?JSON.parse(v):null}catch(e){return null}}
+function localSet(d){try{localStorage.setItem(CHAVE,JSON.stringify(d))}catch(e){}}
+
+/* ---- cada coleção da tela ↔ uma tabela do banco ----
+   A tela continua trabalhando com "dados" na memória. Ao salvar, só o que
+   mudou vai para o banco, registro por registro: duas pessoas mexendo em
+   coisas diferentes ao mesmo tempo não apagam o trabalho uma da outra. */
+const ms=v=>v?new Date(v).getTime():null;
+const isoTs=v=>v?new Date(v).toISOString():null;
+const vazioNulo=v=>(v===''||v==null)?null:v;
+const numOuNulo=v=>{if(v===''||v==null)return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)?n:null};
+const inteiroOuNulo=v=>{const n=numOuNulo(v);return n==null?null:Math.round(n)};
+
+const TABELAS={
+  clientes:{tabela:'clientes',
+    de:r=>({id:r.id,nome:r.nome,contato:r.contato||'',mensalidade:r.mensalidade==null?'':Number(r.mensalidade),
+      diaVenc:r.dia_venc==null?'':r.dia_venc,status:r.status||'ativo',criadoEm:ms(r.criado_em),
+      metaContaId:r.meta_conta_id||null,metaContaNome:r.meta_conta_nome||null,
+      metaPaginaId:r.meta_pagina_id||null,metaPaginaNome:r.meta_pagina_nome||null}),
+    para:c=>({id:c.id,nome:c.nome,contato:vazioNulo(c.contato),mensalidade:numOuNulo(c.mensalidade),
+      dia_venc:inteiroOuNulo(c.diaVenc),status:c.status||'ativo',criado_em:isoTs(c.criadoEm||Date.now()),
+      meta_conta_id:vazioNulo(c.metaContaId),meta_conta_nome:vazioNulo(c.metaContaNome),
+      meta_pagina_id:vazioNulo(c.metaPaginaId),meta_pagina_nome:vazioNulo(c.metaPaginaNome)})},
+  atividades:{tabela:'atividades',
+    de:r=>({id:r.id,clienteId:r.cliente_id,titulo:r.titulo,obs:r.obs||'',prioridade:r.prioridade||'normal',
+      responsavel:r.responsavel||'',recorrencia:r.recorrencia||null,data:r.data||null,criadoEm:ms(r.criado_em),
+      feitaEm:ms(r.feita_em),feitaPor:r.feita_por||null}),
+    para:a=>({id:a.id,cliente_id:a.clienteId,titulo:a.titulo,obs:vazioNulo(a.obs),prioridade:a.prioridade||'normal',
+      responsavel:vazioNulo(a.responsavel),recorrencia:vazioNulo(a.recorrencia),data:vazioNulo(a.data),
+      criado_em:isoTs(a.criadoEm||Date.now()),feita_em:isoTs(a.feitaEm),feita_por:vazioNulo(a.feitaPor)})},
+  compromissos:{tabela:'compromissos',
+    de:r=>({id:r.id,tipo:r.tipo,clienteId:r.cliente_id||null,data:r.data||null,hora:r.hora||null,local:r.local||'',
+      responsavel:r.responsavel||'',obs:r.obs||'',criadoEm:ms(r.criado_em),feitoEm:ms(r.feito_em),feitoPor:r.feito_por||null}),
+    para:c=>({id:c.id,tipo:c.tipo||'Compromisso',cliente_id:vazioNulo(c.clienteId),data:vazioNulo(c.data),hora:vazioNulo(c.hora),
+      local:vazioNulo(c.local),responsavel:vazioNulo(c.responsavel),obs:vazioNulo(c.obs),criado_em:isoTs(c.criadoEm||Date.now()),
+      feito_em:isoTs(c.feitoEm),feito_por:vazioNulo(c.feitoPor)})},
+};
+const ORDEM_GRAVAR=['clientes','atividades','compromissos'];
+const deLog=r=>({id:r.id,ts:ms(r.ts),quem:r.quem||'',acao:r.acao,detalhe:r.detalhe||''});
+
+/* "foto" do que o banco tem, para saber o que mudou */
+let base=null,logPendente=[],sincronizando=false,deNovo=false;
+function fotografar(){
+  base={ajustes:JSON.stringify({equipe:dados.equipe,servicos:dados.servicos}),
+    pagamentos:new Map(Object.entries(dados.pagamentos||{}).map(([k,v])=>[k,String(v)]))};
+  for(const k of ORDEM_GRAVAR)base[k]=new Map((dados[k]||[]).map(o=>[o.id,JSON.stringify(TABELAS[k].para(o))]));
+}
+
+async function lerTudo(tabela,ordem){
+  const todos=[];
+  for(let de=0;;de+=1000){
+    let qy=sb.from(tabela).select('*').range(de,de+999);
+    if(ordem)qy=qy.order(ordem);
+    const {data,error}=await qy;
+    if(error)throw error;
+    todos.push(...data);
+    if(data.length<1000)return todos;
+  }
+}
+
+async function carregar(){
+  if(!naNuvem)return localGet();
+  try{
+    const [cli,ativ,comp,pg,aj]=await Promise.all([
+      lerTudo('clientes','id'),lerTudo('atividades','id'),lerTudo('compromissos','id'),
+      lerTudo('pagamentos'),sb.from('ajustes').select('*').eq('id','principal').maybeSingle()]);
+    let log=[];
+    if(ehAdmin()){
+      const {data}=await sb.from('historico').select('*').order('ts',{ascending:false}).limit(300);
+      log=(data||[]).map(deLog);
+    }
+    const pagamentos={};
+    pg.forEach(p=>pagamentos[p.cliente_id+':'+p.mes]=ms(p.pago_em));
+    return {
+      clientes:cli.map(TABELAS.clientes.de),atividades:ativ.map(TABELAS.atividades.de),
+      compromissos:comp.map(TABELAS.compromissos.de),pagamentos,log,
+      equipe:aj.data?.equipe||['Você'],servicos:aj.data?.servicos||dados.servicos
+    };
+  }catch(e){
+    console.error(e);sinal('local','sem conexão — mostrando a última cópia');
+    const l=localGet();
+    return l?{...l,_offline:true}:{_offline:true};
+  }
+}
+
+async function gravar(d){
+  localSet(d);
+  if(!naNuvem){sinal('local','só neste aparelho');return}
+  if(!base){sinal('local','sem conexão');aviso('Sem conexão com a nuvem: essa alteração não foi salva.');return}
+  sinal('salvando','salvando');
+  clearTimeout(filaSalvar);
+  filaSalvar=setTimeout(sincronizar,300);
+}
+
+const semPermissao=e=>e&&(e.code==='42501'||/row-level security|permiss/i.test(e.message||''));
+async function sincronizar(){
+  if(!base)return;
+  if(sincronizando){deNovo=true;return}
+  sincronizando=true;
+  const erros=[];
+  try{
+    /* 1. cria/atualiza (clientes antes, por causa dos vínculos) */
+    for(const k of ORDEM_GRAVAR){
+      const T=TABELAS[k],mudou=[];
+      for(const o of dados[k]){const s=JSON.stringify(T.para(o));if(base[k].get(o.id)!==s)mudou.push([o.id,s])}
+      if(!mudou.length)continue;
+      const {error}=await sb.from(T.tabela).upsert(mudou.map(([,s])=>JSON.parse(s)));
+      if(error)erros.push(error);else mudou.forEach(([id,s])=>base[k].set(id,s));
+    }
+    /* 2. apaga o que saiu (ordem inversa) */
+    for(const k of [...ORDEM_GRAVAR].reverse()){
+      const vivos=new Set(dados[k].map(o=>o.id));
+      const sairam=[...base[k].keys()].filter(id=>!vivos.has(id));
+      if(!sairam.length)continue;
+      const {error}=await sb.from(TABELAS[k].tabela).delete().in('id',sairam);
+      if(error)erros.push(error);else sairam.forEach(id=>base[k].delete(id));
+    }
+    /* 3. pagamentos (chave "cliente:mês") */
+    const pg=dados.pagamentos||{};
+    for(const [k,v] of Object.entries(pg)){
+      if(base.pagamentos.get(k)===String(v))continue;
+      const [cliente_id,mes]=k.split(':');
+      const {error}=await sb.from('pagamentos').upsert({cliente_id,mes,pago_em:isoTs(v)});
+      if(error)erros.push(error);else base.pagamentos.set(k,String(v));
+    }
+    for(const k of [...base.pagamentos.keys()]){
+      if(k in pg)continue;
+      const [cliente_id,mes]=k.split(':');
+      const {error}=await sb.from('pagamentos').delete().eq('cliente_id',cliente_id).eq('mes',mes);
+      if(error)erros.push(error);else base.pagamentos.delete(k);
+    }
+    /* 4. ajustes (equipe e serviços) */
+    const aj=JSON.stringify({equipe:dados.equipe,servicos:dados.servicos});
+    if(aj!==base.ajustes){
+      const {error}=await sb.from('ajustes').update({equipe:dados.equipe,servicos:dados.servicos}).eq('id','principal');
+      if(error)erros.push(error);else base.ajustes=aj;
+    }
+    /* 5. histórico */
+    if(logPendente.length){
+      const lote=logPendente.splice(0);
+      const {error}=await sb.from('historico').insert(lote.map(l=>({id:l.id,ts:isoTs(l.ts),quem:l.quem,acao:l.acao,detalhe:l.detalhe})));
+      if(error){erros.push(error);logPendente.unshift(...lote)}
+    }
+  }catch(e){erros.push(e)}
+  sincronizando=false;
+  if(!erros.length){sinal('ok','salvo');if(deNovo){deNovo=false;sincronizar()}return}
+  console.error(erros);
+  if(erros.some(semPermissao)){
+    /* a tela deixou fazer algo que o banco não permite: volta ao que está salvo */
+    aviso('Sem permissão para essa alteração. Recarreguei os dados.');
+    await recarregarDaNuvem();
+  }else{
+    sinal('local','sem conexão — tento de novo');
+    clearTimeout(filaSalvar);filaSalvar=setTimeout(sincronizar,6000);
+  }
+}
+
+async function recarregarDaNuvem(){
+  const s=await carregar();
+  if(s&&!s._offline&&s.clientes){dados={...dados,...s};fotografar();localSet(dados);redesenhar();sinal('ok','conectado')}
+  else setTimeout(recarregarDaNuvem,15000);
+}
+
+/* recebe, na hora, o que outra pessoa (ou o Cometinha) mudou */
+let timerRedesenho=null;
+function redesenharLogo(){clearTimeout(timerRedesenho);timerRedesenho=setTimeout(()=>{redesenhar();localSet(dados)},150)}
+function aplicarRemoto(k,p){
+  if(!base)return;
+  if(TABELAS[k]){
+    const T=TABELAS[k];
+    if(p.eventType==='DELETE'){
+      const id=p.old?.id;if(!id)return;
+      dados[k]=dados[k].filter(o=>o.id!==id);base[k].delete(id);
+    }else{
+      const o=T.de(p.new),s=JSON.stringify(T.para(o));
+      if(base[k].get(o.id)===s)return; /* é o que eu mesmo salvei */
+      const i=dados[k].findIndex(x=>x.id===o.id);
+      if(i>=0)dados[k][i]=o;else dados[k].push(o);
+      base[k].set(o.id,s);
+    }
+  }else if(k==='pagamentos'){
+    const r=p.eventType==='DELETE'?p.old:p.new;if(!r?.cliente_id)return;
+    const chave=r.cliente_id+':'+r.mes;
+    if(p.eventType==='DELETE'){delete dados.pagamentos[chave];base.pagamentos.delete(chave)}
+    else{dados.pagamentos[chave]=ms(r.pago_em);base.pagamentos.set(chave,String(dados.pagamentos[chave]))}
+  }else if(k==='historico'){
+    if(p.eventType!=='INSERT'||dados.log.some(l=>l.id===p.new.id))return;
+    dados.log.unshift(deLog(p.new));if(dados.log.length>300)dados.log.length=300;
+  }else if(k==='ajustes'){
+    if(!p.new)return;
+    dados.equipe=p.new.equipe||dados.equipe;dados.servicos=p.new.servicos||dados.servicos;
+    base.ajustes=JSON.stringify({equipe:dados.equipe,servicos:dados.servicos});
+  }
+  redesenharLogo();
+}
+function ouvirNuvem(){
+  if(!naNuvem||canal)return;
+  canal=sb.channel('cometa-v2');
+  for(const t of ['clientes','atividades','compromissos','pagamentos','historico','ajustes'])
+    canal.on('postgres_changes',{event:'*',schema:'public',table:t},p=>aplicarRemoto(t,p));
+  canal.subscribe();
+}
+
+let dados={clientes:[],atividades:[],compromissos:[],pagamentos:{},log:[],equipe:['Você'],servicos:['Captação','Tráfego pago','Edição de vídeo','Postagem','Stories','Reunião','Relatório','Criativo']};
+let telaAtual='geral',clienteAberto=null,filtro='todos',fila=[],timerAviso=null;
+
+/* ============ PERFIL E PERMISSÕES ============ */
+const PERMISSOES=[
+  ['ver_geral','Ver a visão geral'],
+  ['ver_clientes','Ver a lista de clientes'],
+  ['ver_agenda','Ver a agenda de atividades (todas)'],
+  ['ver_compromissos','Ver a agenda externa completa'],
+  ['criar_compromisso','Marcar compromissos externos'],
+  ['lancar','Lançar atividades'],
+  ['concluir','Dar OK em atividades'],
+  ['excluir_atividade','Excluir atividades'],
+  ['editar_clientes','Cadastrar e editar clientes'],
+  ['ver_financeiro','Ver o financeiro'],
+  ['editar_financeiro','Marcar mensalidade como recebida'],
+  ['ajustes','Acessar ajustes e backup'],
+  ['meta_ver','Ver anúncios da Meta dos clientes'],
+  ['meta_editar','Pausar, ativar e mudar orçamento de campanhas'],
+  ['cometinha','Usar o Cometinha (assistente, no CRM e no WhatsApp)']
+];
+let perfil={nome:'Você',papel:'admin',permissoes:{},ativo:true};
+const ehAdmin=()=>perfil.papel==='admin';
+const pode=k=>ehAdmin()||perfil.permissoes?.[k]===true;
+function esconder(id,mostrar){const el=document.getElementById(id);if(el)el.style.display=mostrar?'':'none'}
+
+/* ============ DATAS ============ */
+const isoDe=d=>new Date(d.getTime()-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const hojeISO=()=>isoDe(new Date());
+function diasAte(iso){if(!iso)return null;return Math.round((new Date(iso+'T00:00')-new Date(hojeISO()+'T00:00'))/864e5)}
+function selo(iso){
+  const d=diasAte(iso); if(d===null)return null;
+  if(d<0)return{txt:d===-1?'1 dia atrasado':(-d)+' dias atrasado',cls:'atraso'};
+  if(d===0)return{txt:'Hoje',cls:'hoje'};
+  if(d===1)return{txt:'Amanhã',cls:'amanha'};
+  const p=iso.split('-');return{txt:p[2]+'/'+p[1],cls:''};
+}
+const curta=ts=>new Date(ts).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});
+const mesAtual=()=>hojeISO().slice(0,7);
+function somaDias(iso,n){const d=new Date((iso||hojeISO())+'T00:00');d.setDate(d.getDate()+n);return isoDe(d)}
+
+/* ============ BASE ============ */
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const novoUUID=()=>crypto.randomUUID?crypto.randomUUID():uid()+uid();
+function registrar(acao,detalhe){
+  dados.log=dados.log||[];
+  const l={id:novoUUID(),ts:Date.now(),quem:perfil.nome,acao,detalhe:detalhe||''};
+  dados.log.unshift(l);
+  if(dados.log.length>300)dados.log.length=300;
+  if(naNuvem)logPendente.push(l);
+}
+const cliDe=i=>dados.clientes.find(c=>c.id===i)||{nome:'—'};
+const nomeCli=i=>cliDe(i).nome;
+const abertas=i=>dados.atividades.filter(a=>a.clienteId===i&&!a.feitaEm).sort((x,y)=>((x.data||'9999')+x.titulo)<((y.data||'9999')+y.titulo)?-1:1);
+const fechadas=i=>dados.atividades.filter(a=>a.clienteId===i&&a.feitaEm).sort((x,y)=>y.feitaEm-x.feitaEm);
+const todasAbertas=()=>dados.atividades.filter(a=>!a.feitaEm);
+const ordenados=()=>[...dados.clientes].sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+
+function aviso(txt,acao){
+  const el=document.getElementById('aviso'),bt=document.getElementById('aviso-btn');
+  document.getElementById('aviso-txt').textContent=txt;
+  bt.hidden=!acao;bt.onclick=()=>{acao&&acao();el.classList.remove('ver')};
+  el.classList.add('ver');clearTimeout(timerAviso);
+  timerAviso=setTimeout(()=>el.classList.remove('ver'),acao?5200:2400);
+}
+function abrirModal(html){document.getElementById('modal').innerHTML=html;document.getElementById('fundo').classList.add('ver')}
+function fecharModal(){document.getElementById('fundo').classList.remove('ver')}
+document.getElementById('fundo').onclick=e=>{if(e.target.id==='fundo')fecharModal()};
+
+/* ============ NAVEGAÇÃO ============ */
+const TELAS=[['geral','Visão geral'],['minhas','Minhas'],['clientes','Clientes'],['externa','Externa'],['agenda','Agenda'],['lancar','Lançar'],['financeiro','Financeiro'],['equipe','Equipe'],['historico','Histórico'],['ajustes','Ajustes']];
+function telasVisiveis(){
+  return TELAS.filter(([k])=>{
+    if(k==='geral')return pode('ver_geral');
+    if(k==='minhas')return true;
+    if(k==='clientes')return pode('ver_clientes');
+    if(k==='externa')return pode('ver_compromissos')||pode('criar_compromisso');
+    if(k==='agenda')return pode('ver_agenda');
+    if(k==='lancar')return pode('lancar');
+    if(k==='financeiro')return pode('ver_financeiro');
+    if(k==='equipe')return ehAdmin()&&naNuvem;
+    if(k==='historico')return ehAdmin();
+    if(k==='ajustes')return pode('ajustes');
+    return true;
+  });
+}
+function montarNav(){
+  const ab=todasAbertas(),n=ab.length,visiveis=telasVisiveis();
+  const atrasoTotal=ab.filter(a=>a.data&&diasAte(a.data)<0).length+compAbertos().filter(c=>c.data&&diasAte(c.data)<0).length;
+  const atrasoMeu=ab.filter(a=>a.data&&diasAte(a.data)<0&&a.responsavel===perfil.nome).length
+    +compAbertos().filter(c=>c.data&&diasAte(c.data)<0&&c.responsavel===perfil.nome).length;
+  const pip=k=>{
+    if(k==='geral')return atrasoTotal?`<span class="pip alerta">${atrasoTotal}</span>`:(n?`<span class="pip">${n}</span>`:'');
+    if(k==='minhas')return atrasoMeu?`<span class="pip alerta">${atrasoMeu}</span>`:'';
+    return '';
+  };
+  document.getElementById('nav').innerHTML=visiveis.map(([k,r])=>
+    `<button data-t="${k}" aria-current="${k===telaAtual}">${r}${pip(k)}</button>`).join('');
+  document.getElementById('barra').innerHTML=visiveis.map(([k,r])=>
+    `<button data-t="${k}" aria-current="${k===telaAtual||(telaAtual==='ficha'&&k==='clientes')}">${r==='Visão geral'?'Geral':r}${pip(k)}</button>`).join('');
+  document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>ir(b.dataset.t));
+  document.getElementById('rodape').textContent=perfil.nome+' · '+(ehAdmin()?'administrador':'operador');
+}
+function ir(t){
+  telaAtual=t;
+  document.querySelectorAll('.tela').forEach(s=>s.classList.remove('ativa'));
+  document.getElementById('t-'+t).classList.add('ativa');
+  if(t==='geral')pintarGeral();
+  if(t==='clientes')pintarClientes();
+  if(t==='agenda')pintarAgenda();
+  if(t==='lancar')montarLancar();
+  if(t==='minhas')pintarMinhas();
+  if(t==='externa')pintarExterna();
+  if(t==='equipe')pintarEquipe();
+  if(t==='financeiro')pintarFinanceiro();
+  if(t==='historico')pintarHistorico();
+  if(t==='ajustes')montarAjustes();
+  montarNav();window.scrollTo(0,0);
+}
+
+/* ============ LINHA DE ATIVIDADE ============ */
+function linha(a,mostrarCliente){
+  const s=a.data?selo(a.data):null;
+  return `<div class="item" data-item="${a.id}">
+    <div class="corpo">
+      <div class="tit">${mostrarCliente?`<span class="dono">${esc(nomeCli(a.clienteId))}</span> · `:''}${esc(a.titulo)}</div>
+      <div class="sub">
+        ${s?`<span class="tag ${s.cls}">${s.txt}</span>`:'<span class="tag">Sem data</span>'}
+        ${a.prioridade==='alta'?'<span class="tag alta">Prioridade</span>':''}
+        ${a.recorrencia?'<span class="tag rec">Repete</span>':''}
+        ${a.responsavel?`<span>${esc(a.responsavel)}</span>`:''}
+        ${a.obs?`<span>${esc(a.obs)}</span>`:''}
+      </div>
+    </div>
+    ${pode('lancar')?`<button class="mini" data-edit-ativ="${a.id}">editar</button>`:''}
+    ${pode('excluir_atividade')?`<button class="mini perigo" data-del="${a.id}">excluir</button>`:''}
+    ${pode('concluir')?`<button class="ok" data-ok="${a.id}">OK</button>`:''}
+  </div>`;
+}
+function ligarLinhas(raiz){
+  raiz.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>darOk(b.dataset.ok,b));
+  raiz.querySelectorAll('[data-edit-ativ]').forEach(b=>b.onclick=()=>
+    formAtividade(dados.atividades.find(x=>x.id===b.dataset.editAtiv)));
+  raiz.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{
+    const a=dados.atividades.find(x=>x.id===b.dataset.del);
+    dados.atividades=dados.atividades.filter(x=>x.id!==b.dataset.del);
+    registrar('Excluiu atividade',nomeCli(a.clienteId)+' — '+a.titulo);
+    await gravar(dados);redesenhar();
+    aviso('Atividade excluída',async()=>{dados.atividades.push(a);await gravar(dados);redesenhar()});
+  });
+}
+function formAtividade(a){
+  abrirModal(`<h3>Editar atividade</h3>
+    <div class="campo"><label>Cliente</label><div style="font-weight:600;padding:2px 0">${esc(nomeCli(a.clienteId))}</div></div>
+    <div class="campo"><label for="e-tit">Serviço</label><input id="e-tit" value="${esc(a.titulo)}"></div>
+    <div class="dupla">
+      <div class="campo"><label for="e-data">Data</label><input type="date" id="e-data" value="${esc(a.data||'')}"></div>
+      <div class="campo"><label for="e-prio">Prioridade</label><select id="e-prio">
+        <option value="normal" ${a.prioridade!=='alta'?'selected':''}>Normal</option>
+        <option value="alta" ${a.prioridade==='alta'?'selected':''}>Alta</option></select></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label for="e-resp">Responsável</label><select id="e-resp">
+        <option value="">—</option>
+        ${dados.equipe.map(p=>`<option ${a.responsavel===p?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+      <div class="campo"><label for="e-rec">Repetir</label><select id="e-rec">
+        <option value="" ${!a.recorrencia?'selected':''}>Não repete</option>
+        <option value="1" ${a.recorrencia==='1'?'selected':''}>Todo dia</option>
+        <option value="7" ${a.recorrencia==='7'?'selected':''}>Toda semana</option>
+        <option value="14" ${a.recorrencia==='14'?'selected':''}>A cada 15 dias</option>
+        <option value="30" ${a.recorrencia==='30'?'selected':''}>Todo mês</option>
+      </select></div>
+    </div>
+    <div class="campo"><label for="e-obs">Observação</label><textarea id="e-obs">${esc(a.obs||'')}</textarea></div>
+    <button class="btn" id="e-salvar">Salvar</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('e-salvar').onclick=async()=>{
+    const tit=document.getElementById('e-tit').value.trim();
+    if(!tit)return aviso('Escreva o serviço');
+    a.titulo=tit;a.data=document.getElementById('e-data').value||null;
+    a.prioridade=document.getElementById('e-prio').value;
+    a.responsavel=document.getElementById('e-resp').value;
+    a.recorrencia=document.getElementById('e-rec').value||null;
+    a.obs=document.getElementById('e-obs').value.trim();
+    registrar('Editou atividade',nomeCli(a.clienteId)+' — '+a.titulo);
+    await gravar(dados);fecharModal();redesenhar();aviso('Atividade atualizada');
+  };
+}
+function bloco(lista,alvo,vazio,mostrarCliente){
+  const el=document.getElementById(alvo);
+  el.innerHTML=lista.length?`<div class="painel">${lista.map(a=>linha(a,mostrarCliente!==false)).join('')}</div>`
+    :`<div class="nada">${vazio}</div>`;
+  ligarLinhas(el);
+}
+async function darOk(aid,botao){
+  const a=dados.atividades.find(x=>x.id===aid);
+  a.feitaEm=Date.now();
+  a.feitaPor=perfil.nome;
+  let nova=null;
+  if(a.recorrencia){
+    nova={id:uid(),clienteId:a.clienteId,titulo:a.titulo,obs:a.obs,prioridade:a.prioridade,
+      responsavel:a.responsavel,recorrencia:a.recorrencia,
+      data:somaDias(a.data||hojeISO(),Number(a.recorrencia)),criadoEm:Date.now(),feitaEm:null};
+    dados.atividades.push(nova);
+  }
+  registrar('Concluiu atividade',nomeCli(a.clienteId)+' — '+a.titulo);
+  await gravar(dados);
+  const item=botao.closest('.item');
+  if(item){item.classList.add('saindo');setTimeout(redesenhar,420)}else redesenhar();
+  aviso(a.titulo+' — concluído'+(nova?' · próxima em '+selo(nova.data).txt.toLowerCase():''),async()=>{
+    a.feitaEm=null;
+    if(nova)dados.atividades=dados.atividades.filter(x=>x.id!==nova.id);
+    await gravar(dados);redesenhar();
+  });
+}
+function redesenhar(){
+  if(telaAtual==='ficha'&&clienteAberto)abrirFicha(clienteAberto);
+  else ir(telaAtual);
+  montarNav();
+}
+
+/* ============ VISÃO GERAL ============ */
+function pintarGeral(){
+  const ab=todasAbertas();
+  const atras=ab.filter(a=>a.data&&diasAte(a.data)<0).sort((x,y)=>x.data<y.data?-1:1);
+  const hoje=ab.filter(a=>a.data&&diasAte(a.data)===0);
+  const amanha=ab.filter(a=>a.data&&diasAte(a.data)===1);
+  const rec=dados.atividades.filter(a=>a.feitaEm&&Date.now()-a.feitaEm<7*864e5).sort((x,y)=>y.feitaEm-x.feitaEm);
+  const ativos=dados.clientes.filter(c=>c.status!=='pausado');
+  const mrr=ativos.reduce((s,c)=>s+(Number(c.mensalidade)||0),0);
+  const d=new Date();
+  document.getElementById('sub-geral').textContent=
+    d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,m=>m.toUpperCase());
+
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi"><div class="rot">Em aberto</div><div class="num">${ab.length}</div><div class="pe">${ativos.length} clientes ativos</div></div>
+    <div class="kpi ${atras.length?'alerta':''}"><div class="rot">Atrasado</div><div class="num">${atras.length}</div><div class="pe">${atras.length?'precisa de atenção':'nada atrasado'}</div></div>
+    <div class="kpi verde"><div class="rot">Entregue · 7 dias</div><div class="num">${rec.length}</div><div class="pe">últimos sete dias</div></div>
+    <div class="kpi"><div class="rot">Receita mensal</div><div class="num">${mrr?'R$ '+mrr.toLocaleString('pt-BR'):'—'}</div><div class="pe">soma dos contratos ativos</div></div>`;
+
+  const compHoje=compAbertos().filter(c=>c.data&&diasAte(c.data)<=1);
+  if(compHoje.length){
+    const q=document.getElementById('prazos-comp')||(()=>{
+      const d=document.createElement('div');d.id='prazos-comp';
+      document.getElementById('kpis').after(d);return d;})();
+    q.innerHTML=`<div class="rotulo">Agenda externa · hoje e amanhã</div>
+      <div class="painel">${compHoje.map(cartaoComp).join('')}</div>`;
+    ligarComp(q);
+  }else{const q=document.getElementById('prazos-comp');if(q)q.innerHTML=''}
+  bloco(atras,'bl-atraso','<b>Nada atrasado</b>Está tudo dentro do prazo.');
+  bloco(hoje,'bl-hoje','<b>Sem entrega marcada para hoje</b>Aproveite para adiantar o que está sem data.');
+  bloco(amanha,'bl-amanha','<b>Amanhã está livre</b>Nenhuma atividade marcada.');
+  const el=document.getElementById('bl-recentes');
+  el.innerHTML=rec.length?`<div class="painel">${rec.map(a=>`<div class="item"><div class="corpo">
+      <div class="tit"><span class="dono">${esc(nomeCli(a.clienteId))}</span> · ${esc(a.titulo)}</div>
+      <div class="sub"><span class="tag">${curta(a.feitaEm)}</span>${a.feitaPor?`<span>${esc(a.feitaPor)}</span>`:''}</div>
+    </div></div>`).join('')}</div>`:`<div class="nada"><b>Nada entregue ainda</b>O que você marcar como OK aparece aqui.</div>`;
+}
+
+/* ============ CLIENTES ============ */
+function anel(feitas,total){
+  const p=total?feitas/total:0,c=2*Math.PI*19;
+  return `<div class="anel"><svg width="46" height="46">
+    <circle cx="23" cy="23" r="19" stroke="#E9EBF5" stroke-width="5" fill="none"></circle>
+    <circle cx="23" cy="23" r="19" stroke="${p>=1?'#0E9F6E':'#4B3BE4'}" stroke-width="5" fill="none"
+      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-p)}"></circle>
+  </svg><span>${Math.round(p*100)}%</span></div>`;
+}
+function pintarClientes(){
+  const q=document.getElementById('busca').value.trim().toLowerCase();
+  let lista=ordenados().filter(c=>c.nome.toLowerCase().includes(q));
+  lista=lista.filter(c=>{
+    const p=abertas(c.id),atr=p.some(a=>a.data&&diasAte(a.data)<0);
+    if(filtro==='atraso')return atr;
+    if(filtro==='pend')return p.length>0;
+    if(filtro==='livre')return p.length===0&&c.status!=='pausado';
+    if(filtro==='pausado')return c.status==='pausado';
+    return true;
+  });
+  const alvo=document.getElementById('cards');
+  if(!lista.length){alvo.innerHTML=`<div class="nada"><b>Nenhum cliente por aqui</b>Mude o filtro ou cadastre um cliente novo.</div>`;return}
+  alvo.innerHTML=lista.map(c=>{
+    const p=abertas(c.id);
+    const feitasMes=dados.atividades.filter(a=>a.clienteId===c.id&&a.feitaEm&&isoDe(new Date(a.feitaEm)).slice(0,7)===mesAtual()).length;
+    const linhas=p.slice(0,3).map(a=>{
+      const d=diasAte(a.data),cls=d!==null&&d<0?'atraso':(d===1?'amanha':'');
+      const s=a.data?selo(a.data).txt:'';
+      return `<div class="pl"><span class="bola ${cls}"></span>${esc(a.titulo)}${s?' · '+s:''}</div>`;
+    }).join('');
+    return `<button class="cli" data-c="${c.id}">
+      <div class="cli-topo">${anel(feitasMes,feitasMes+p.length)}
+        <div><h3>${esc(c.nome)}</h3><div class="meta">
+          ${p.length?p.length+' em aberto':'tudo em dia'}${c.mensalidade?' · R$ '+Number(c.mensalidade).toLocaleString('pt-BR')+(c.diaVenc?' · dia '+c.diaVenc:''):''}
+          ${c.status==='pausado'?' <span class="tag pausado">pausado</span>':''}
+        </div></div></div>
+      ${p.length?`<div class="pend">${linhas}${p.length>3?`<div class="pl" style="padding-left:15px">+ ${p.length-3} atividade(s)</div>`:''}</div>`
+        :`<div class="limpo">Nada pendente</div>`}
+    </button>`;
+  }).join('');
+  alvo.querySelectorAll('.cli').forEach(b=>b.onclick=()=>abrirFicha(b.dataset.c));
+}
+document.getElementById('busca').oninput=pintarClientes;
+document.querySelectorAll('#filtros .f').forEach(b=>b.onclick=()=>{
+  filtro=b.dataset.f;
+  document.querySelectorAll('#filtros .f').forEach(o=>o.setAttribute('aria-pressed',o===b));
+  pintarClientes();
+});
+
+/* ============ FICHA ============ */
+function abrirFicha(cid){
+  clienteAberto=cid;telaAtual='ficha';
+  const c=cliDe(cid),p=abertas(cid),f=fechadas(cid);
+  document.querySelectorAll('.tela').forEach(s=>s.classList.remove('ativa'));
+  document.getElementById('t-ficha').classList.add('ativa');
+  document.getElementById('f-nome').textContent=c.nome;
+  document.getElementById('f-sub').innerHTML=[
+    p.length?`${p.length} em aberto`:'Nada pendente',
+    `${f.length} entregue${f.length===1?'':'s'}`,
+    c.mensalidade?`R$ ${Number(c.mensalidade).toLocaleString('pt-BR')}/mês`:null,
+    c.contato?esc(c.contato):null,
+    c.status==='pausado'?'<span class="tag pausado">pausado</span>':null
+  ].filter(Boolean).join(' · ');
+
+  bloco(p,'f-pend','<b>Zerado</b>Nenhuma atividade em aberto para este cliente.',false);
+  const cAgenda=compAbertos().filter(x=>x.clienteId===cid);
+  let box=document.getElementById('f-comp');
+  if(!box){box=document.createElement('div');box.id='f-comp';document.getElementById('f-pend').after(box)}
+  box.innerHTML=cAgenda.length?`<div class="rotulo">Agenda externa</div>
+    <div class="painel">${cAgenda.map(cartaoComp).join('')}</div>`:'';
+  ligarComp(box);
+
+  document.getElementById('f-hist').innerHTML=f.length?f.map(a=>`
+    <div class="lt"><div style="font-size:14.5px">${esc(a.titulo)}</div>
+      <div class="q">Feito em ${curta(a.feitaEm)}${a.feitaPor?' por '+esc(a.feitaPor):(a.responsavel?' · '+esc(a.responsavel):'')}
+      <button class="mini" style="border:none;padding:2px 6px;color:var(--cometa)" data-volta="${a.id}">reabrir</button></div></div>`).join('')
+    :`<div class="nada" style="margin-left:-22px">Ainda sem histórico.</div>`;
+  document.getElementById('f-hist').querySelectorAll('[data-volta]').forEach(b=>b.onclick=async()=>{
+    const at=dados.atividades.find(x=>x.id===b.dataset.volta);
+    at.feitaEm=null;
+    registrar('Reabriu atividade',nomeCli(at.clienteId)+' — '+at.titulo);
+    await gravar(dados);abrirFicha(cid);aviso('Atividade reaberta');
+  });
+  pintarMeta(cid);
+  montarNav();
+  if(fichaAnterior!==cid)window.scrollTo(0,0);
+  fichaAnterior=cid;
+}
+let fichaAnterior=null;
+
+/* ============ ANÚNCIOS (META) NA FICHA ============
+   A chave da Meta nunca chega ao navegador: tudo passa pela função "meta" do servidor. */
+async function chamarFuncao(nome,corpo){
+  if(!naNuvem)return demoFuncao(nome,corpo);
+  const {data,error}=await sb.functions.invoke(nome,{body:corpo});
+  if(error){
+    let msg=error.message;
+    try{const j=await error.context.json();if(j?.erro)msg=j.erro}catch(e){}
+    throw new Error(msg);
+  }
+  return data;
+}
+/* ---- modo demonstração (sem nuvem): respostas de exemplo para ver a tela funcionando ---- */
+async function demoFuncao(nome,b){
+  await new Promise(r=>setTimeout(r,450));
+  if(nome==='cometinha'){
+    if(b.acao==='historico')return {mensagens:[]};
+    return {resposta:'Estou em *modo demonstração*: ainda não fui ligado à inteligência (falta a chave da OpenAI) nem ao banco de dados.\n\nQuando ligarem, eu vou responder pedidos como esse de verdade, lendo e mexendo no CRM. Você disse: _'+(b.texto||'(áudio)')+'_',acoes:[],transcricao:b.audio?'(áudio de exemplo: a transcrição liga junto com a chave da OpenAI)':null};
+  }
+  if(nome==='meta'){
+    const f={hoje:.15,ontem:.15,'7d':1,'30d':4.1,mes:1.3}[b.periodo]||1;
+    if(b.acao==='contas')return {contas:dados.clientes.slice(0,6).map((c,i)=>({id:String(1000+i),nome:c.nome+' · Anúncios',empresa:c.nome,status:'ativa'})),
+      paginas:dados.clientes.slice(0,6).map((c,i)=>({id:'pg'+i,nome:c.nome,instagram:c.nome.toLowerCase().replace(/[^a-z]/g,'')}))};
+    if(b.acao==='resumo'){
+      const g=+(184.6*f).toFixed(2),cv=Math.round(37*f);
+      return {periodo:b.periodo,nomePeriodo:{hoje:'hoje',ontem:'ontem','7d':'últimos 7 dias','30d':'últimos 30 dias',mes:'este mês'}[b.periodo],
+        conta:{id:'1000',nome:'Conta de exemplo',status:'ativa',gastoTotal:2640,limite:3000,restanteLimite:360,prePago:false,formaPagamento:'Cartão final 4242'},
+        total:{gasto:g,impressoes:Math.round(26400*f),alcance:Math.round(11800*f),cliques:Math.round(390*f),conversas:cv,leads:0,custoConversa:cv?+(g/cv).toFixed(2):null,custoLead:null},
+        campanhas:[
+          {id:'c1',nome:'Promoção da semana',status:'ACTIVE',situacao:'ativa',ativa:true,orcamentoDiario:20,orcamentoTotal:null,orcamentoNoConjunto:false,gasto:+(g*.7).toFixed(2),conversas:Math.round(cv*.75),leads:0,custoConversa:4.65,custoLead:null},
+          {id:'c2',nome:'Reconhecimento de marca',status:'ACTIVE',situacao:'ativa',ativa:true,orcamentoDiario:null,orcamentoTotal:null,orcamentoNoConjunto:true,gasto:+(g*.3).toFixed(2),conversas:Math.round(cv*.25),leads:0,custoConversa:6.1,custoLead:null},
+          {id:'c3',nome:'Black Friday (antiga)',status:'PAUSED',situacao:'pausada',ativa:false,orcamentoDiario:35,orcamentoTotal:null,orcamentoNoConjunto:false,gasto:0,conversas:0,leads:0,custoConversa:null,custoLead:null}],
+        alertas:['Exemplo de alerta: o limite da conta está quase no fim (restam R$ 360,00).']};
+    }
+    if(b.acao==='conjuntos')return {conjuntos:[{id:'s1',nome:'Público 25-45 · cidade',status:'ACTIVE',situacao:'ativa',ativa:true,orcamentoDiario:15,gasto:31.2,conversas:6,leads:0,custoConversa:5.2}]};
+    if(b.acao==='publicacoes')return {fonte:'instagram',conta:'@exemplo',itens:[
+      {id:'1',texto:'Promoção de terça! Só hoje 🎉',data:new Date(Date.now()-864e5).toISOString(),curtidas:132,comentarios:14,link:'#'},
+      {id:'2',texto:'Bastidores da gravação com a equipe',data:new Date(Date.now()-3*864e5).toISOString(),curtidas:89,comentarios:6,link:'#'},
+      {id:'3',texto:'Novidade chegando…',data:new Date(Date.now()-5*864e5).toISOString(),curtidas:201,comentarios:31,link:'#'}]};
+    if(b.acao==='alterar')return {id:b.objetoId,nomeAntes:'exemplo',antes:{},depois:{}};
+    if(b.acao==='info_chave')return {propria:false};
+    throw new Error('No modo demonstração isso não está disponível.');
+  }
+  throw new Error('Função indisponível no modo demonstração.');
+}
+
+const metaCache={};
+let metaPeriodo='7d';
+const PERIODOS_META=[['hoje','Hoje'],['ontem','Ontem'],['7d','7 dias'],['30d','30 dias'],['mes','Este mês']];
+const brl=v=>v==null?'—':'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const inteiro=v=>Number(v||0).toLocaleString('pt-BR');
+
+function pintarMeta(cid,forcar){
+  const caixa=document.getElementById('f-meta-caixa'),el=document.getElementById('f-meta');
+  const c=cliDe(cid);
+  const ver=pode('meta_ver')||pode('editar_clientes');
+  caixa.style.display=ver?'':'none';
+  if(!ver)return;
+  if(!c.metaContaId){
+    el.innerHTML=`<div class="nada"><b>Sem conta de anúncio ligada</b>
+      ${pode('editar_clientes')?'Ligue a conta da Meta deste cliente para ver gasto, campanhas e publicações aqui.<br><button class="mini" style="margin-top:12px" id="b-ligar-meta">Ligar conta da Meta</button>':'Peça para quem cadastra clientes ligar a conta.'}</div>`;
+    const b=document.getElementById('b-ligar-meta');if(b)b.onclick=()=>formLigarMeta(cid);
+    return;
+  }
+  if(!pode('meta_ver')){el.innerHTML=`<div class="nada">Conta ligada: <b>${esc(c.metaContaNome||c.metaContaId)}</b>Você não tem permissão para ver os anúncios.</div>`;return}
+  const chave=cid+':'+metaPeriodo,cache=metaCache[chave];
+  if(cache&&!forcar&&Date.now()-cache.t<3*60e3){desenharMeta(cid,cache);return}
+  if(!cache||forcar)el.innerHTML='<div class="carregando">Buscando os números na Meta…</div>';
+  const pedido=metaCache[chave]={...(cache||{}),t:Date.now(),carregando:true};
+  Promise.all([
+    chamarFuncao('meta',{acao:'resumo',clienteId:cid,periodo:metaPeriodo}).then(r=>({r}),e=>({erro:e.message})),
+    c.metaPaginaId&&!(cache&&cache.posts&&!forcar)
+      ?chamarFuncao('meta',{acao:'publicacoes',clienteId:cid}).then(p=>({p}),e=>({erroPosts:e.message}))
+      :Promise.resolve({p:cache?.posts})
+  ]).then(([a,b])=>{
+    Object.assign(pedido,{carregando:false,resumo:a.r||null,erro:a.erro||null,posts:b.p||null,erroPosts:b.erroPosts||null});
+    if(telaAtual==='ficha'&&clienteAberto===cid)desenharMeta(cid,pedido);
+  });
+}
+
+function desenharMeta(cid,m){
+  const el=document.getElementById('f-meta'),c=cliDe(cid),r=m.resumo;
+  const topo=`<div class="meta-topo">
+      <div class="chips">${PERIODOS_META.map(([k,t])=>`<button class="chip" data-mp="${k}" aria-pressed="${k===metaPeriodo}">${t}</button>`).join('')}</div>
+      <div class="acoes"><button class="mini" id="b-meta-atual">atualizar</button>
+        ${pode('editar_clientes')?'<button class="mini" id="b-ligar-meta">trocar conta</button>':''}</div>
+    </div>`;
+  let corpo='';
+  if(m.erro)corpo=`<div class="meta-alerta">${esc(m.erro)}</div>`;
+  else if(r){
+    const t=r.total,conta=r.conta;
+    const resultado=t.conversas>=t.leads?{n:t.conversas,rot:'Conversas',custo:t.custoConversa}:{n:t.leads,rot:'Leads',custo:t.custoLead};
+    const saldo=conta.restanteLimite!=null
+      ?{num:brl(conta.restanteLimite),pe:'sobra do limite de '+brl(conta.limite)}
+      :{num:brl(conta.gastoTotal),pe:'gasto total da conta'};
+    corpo=`<div class="grade kpis">
+        <div class="kpi"><div class="rot">Gasto · ${esc(r.nomePeriodo)}</div><div class="num">${brl(t.gasto).replace(',00','')}</div><div class="pe">${inteiro(t.impressoes)} impressões · ${inteiro(t.cliques)} cliques</div></div>
+        <div class="kpi verde"><div class="rot">${resultado.rot}</div><div class="num">${inteiro(resultado.n)}</div><div class="pe">${resultado.custo!=null?brl(resultado.custo)+' cada':'sem resultado no período'}</div></div>
+        <div class="kpi ${conta.restanteLimite!=null&&conta.limite&&conta.restanteLimite<conta.limite*.1?'alerta':''}"><div class="rot">${conta.restanteLimite!=null?'Limite da conta':'Conta'}</div><div class="num">${saldo.num.replace(',00','')}</div><div class="pe">${saldo.pe}</div></div>
+        <div class="kpi"><div class="rot">Situação</div><div class="num" style="font-size:20px;margin-top:9px">${esc(conta.status)}</div><div class="pe">${esc(conta.formaPagamento||(conta.prePago?'pré-paga':'cartão / fatura'))}</div></div>
+      </div>
+      ${r.alertas.length?`<div class="meta-alertas">${r.alertas.map(a=>`<div class="meta-alerta">${esc(a)}</div>`).join('')}</div>`:''}
+      <div class="rotulo">Campanhas · ${esc(conta.nome||'')}</div>
+      ${r.campanhas.length?`<div class="painel" id="meta-camps">${r.campanhas.map(x=>linhaCampanha(x)).join('')}</div>`
+        :'<div class="nada">Nenhuma campanha ativa ou pausada nesta conta.</div>'}`;
+  }else corpo='<div class="carregando">Buscando os números na Meta…</div>';
+
+  let posts='';
+  if(c.metaPaginaId){
+    const p=m.posts;
+    posts=`<div class="rotulo">Últimas publicações${p?' · '+esc(p.conta):''}</div>`+
+      (m.erroPosts?`<div class="meta-alerta">${esc(m.erroPosts)}</div>`
+        :p?(p.itens.length?`<div class="posts">${p.itens.map(i=>`<a class="post" href="${esc(i.link)}" target="_blank" rel="noopener">
+              <div class="img" style="background-image:url('${esc(i.imagem||'')}')"></div>
+              <div class="info">${i.data?new Date(i.data).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'}):''}
+                ${i.curtidas!=null?' · ♥ '+inteiro(i.curtidas):''}${i.comentarios!=null?' · 💬 '+inteiro(i.comentarios):''}
+                <p>${esc(i.texto||'(sem legenda)')}</p></div></a>`).join('')}</div>`
+          :'<div class="nada">Nenhuma publicação encontrada.</div>')
+        :'<div class="carregando">Buscando publicações…</div>');
+  }
+  el.innerHTML=topo+corpo+posts;
+  el.querySelectorAll('[data-mp]').forEach(b=>b.onclick=()=>{metaPeriodo=b.dataset.mp;pintarMeta(cid)});
+  document.getElementById('b-meta-atual').onclick=()=>pintarMeta(cid,true);
+  const lg=document.getElementById('b-ligar-meta');if(lg)lg.onclick=()=>formLigarMeta(cid);
+  ligarCampanhas(el,cid);
+}
+
+function linhaCampanha(x,conjunto){
+  const res=x.conversas||x.leads?`${inteiro(x.conversas||x.leads)} ${x.conversas?'conversas':'leads'} · ${brl(x.custoConversa??x.custoLead)} cada`:'sem resultado';
+  const orc=x.orcamentoDiario!=null?brl(x.orcamentoDiario)+'/dia':x.orcamentoTotal!=null?brl(x.orcamentoTotal)+' total':(conjunto?'—':'orçamento nos conjuntos');
+  const ed=pode('meta_editar');
+  return `<div class="item meta-campanha ${conjunto?'meta-conj':''}" data-camp="${esc(x.id)}">
+    <div class="corpo">
+      <div class="tit">${esc(x.nome)} <span class="tag ${x.ativa?'rec':(/reprov|problema/.test(x.situacao)?'atraso':'pausado')}">${esc(x.situacao)}</span></div>
+      <div class="sub"><span class="num">${brl(x.gasto)}</span><span>${res}</span><span>${orc}</span></div>
+    </div>
+    ${!conjunto&&x.orcamentoNoConjunto?`<button class="mini" data-conj="${esc(x.id)}">conjuntos</button>`:''}
+    ${ed&&x.orcamentoDiario!=null?`<button class="mini" data-orc="${esc(x.id)}" data-v="${x.orcamentoDiario}" data-n="${esc(x.nome)}">orçamento</button>`:''}
+    ${ed&&x.status!=='ARCHIVED'?`<button class="${x.status==='ACTIVE'?'mini':'ok'}" data-st="${esc(x.id)}" data-para="${x.status==='ACTIVE'?'PAUSED':'ACTIVE'}" data-n="${esc(x.nome)}">${x.status==='ACTIVE'?'pausar':'ativar'}</button>`:''}
+  </div>`;
+}
+
+function ligarCampanhas(raiz,cid){
+  const c=cliDe(cid);
+  raiz.querySelectorAll('[data-st]').forEach(b=>b.onclick=async()=>{
+    const ativar=b.dataset.para==='ACTIVE';
+    if(!confirm(`${ativar?'Ativar':'Pausar'} "${b.dataset.n}" na conta de ${c.nome}?${ativar?'\n\nEla volta a gastar dinheiro do cliente.':''}`))return;
+    b.disabled=true;b.textContent='…';
+    try{await chamarFuncao('meta',{acao:'alterar',clienteId:cid,objetoId:b.dataset.st,status:b.dataset.para});
+      aviso(ativar?'Campanha ativada':'Campanha pausada');pintarMeta(cid,true)}
+    catch(e){aviso(e.message);b.disabled=false;b.textContent=ativar?'ativar':'pausar'}
+  });
+  raiz.querySelectorAll('[data-orc]').forEach(b=>b.onclick=async()=>{
+    const v=prompt(`Novo orçamento diário de "${b.dataset.n}" (em R$).\nHoje: ${brl(b.dataset.v)}/dia`,b.dataset.v);
+    if(v==null)return;
+    const n=numOuNulo(v);
+    if(!n||n<1)return aviso('Valor inválido');
+    if(!confirm(`Mudar o orçamento de "${b.dataset.n}" de ${brl(b.dataset.v)} para ${brl(n)} por dia?`))return;
+    try{await chamarFuncao('meta',{acao:'alterar',clienteId:cid,objetoId:b.dataset.orc,orcamentoDiario:n});
+      aviso('Orçamento atualizado');pintarMeta(cid,true)}
+    catch(e){aviso(e.message)}
+  });
+  raiz.querySelectorAll('[data-conj]').forEach(b=>b.onclick=async()=>{
+    const linha=b.closest('.item');
+    if(linha.nextElementSibling?.classList.contains('meta-conj')){
+      while(linha.nextElementSibling?.classList.contains('meta-conj'))linha.nextElementSibling.remove();return}
+    b.textContent='…';
+    try{
+      const {conjuntos}=await chamarFuncao('meta',{acao:'conjuntos',clienteId:cid,campanhaId:b.dataset.conj,periodo:metaPeriodo});
+      linha.insertAdjacentHTML('afterend',conjuntos.length?conjuntos.map(s=>linhaCampanha(s,true)).join('')
+        :'<div class="item meta-conj"><div class="corpo sub">Sem conjuntos ativos.</div></div>');
+      ligarCampanhas(linha.parentElement,cid);
+    }catch(e){aviso(e.message)}
+    b.textContent='conjuntos';
+  });
+}
+
+async function formLigarMeta(cid){
+  const c=cliDe(cid);
+  abrirModal(`<h3>Conta da Meta · ${esc(c.nome)}</h3><div class="carregando">Buscando as contas que a Cometa acessa…</div>`);
+  let lista;
+  try{lista=await chamarFuncao('meta',{acao:'contas'})}
+  catch(e){abrirModal(`<h3>Conta da Meta</h3><div class="meta-alerta">${esc(e.message)}</div>
+    <button class="btn sec" style="margin-top:12px" onclick="fecharModal()">Fechar</button>`);return}
+  const opc=(nome,itens,atual,sub)=>`<div class="lista-escolha">
+      <label><input type="radio" name="${nome}" value="" ${!atual?'checked':''}> <span>Nenhuma</span></label>
+      ${itens.map(i=>`<label data-busca="${esc((i.nome+' '+(sub(i)||'')).toLowerCase())}"><input type="radio" name="${nome}" value="${esc(i.id)}" data-nome="${esc(i.nome)}" ${atual===i.id?'checked':''}>
+        <span>${esc(i.nome)}<small>${esc(sub(i)||'')}</small></span></label>`).join('')}</div>`;
+  abrirModal(`<h3>Conta da Meta · ${esc(c.nome)}</h3>
+    <input class="busca" id="lm-busca" placeholder="Filtrar pelo nome" style="max-width:none;margin-bottom:12px">
+    <div class="campo"><label>Conta de anúncio</label>${opc('lm-conta',lista.contas,c.metaContaId,i=>[i.empresa,i.status!=='ativa'?i.status:'',i.id].filter(Boolean).join(' · '))}</div>
+    <div class="campo"><label>Página (para as publicações)</label>${opc('lm-pag',lista.paginas,c.metaPaginaId,i=>i.instagram?'@'+i.instagram:'sem Instagram ligado')}</div>
+    ${!lista.contas.length?'<p style="font-size:13px;color:var(--suave)">Nenhuma conta apareceu. Confira se a conta deste cliente foi atribuída ao usuário do sistema no Gerenciador de Negócios da Cometa.</p>':''}
+    <button class="btn" id="lm-salvar">Salvar</button>
+    ${ehAdmin()?'<button class="btn sec" style="margin-top:8px" id="lm-chave">Usar chave própria deste cliente (exceção)</button>':''}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('lm-busca').oninput=e=>{
+    const q=e.target.value.trim().toLowerCase();
+    document.querySelectorAll('.lista-escolha label[data-busca]').forEach(l=>l.style.display=l.dataset.busca.includes(q)?'':'none');
+  };
+  document.getElementById('lm-salvar').onclick=async()=>{
+    const ct=document.querySelector('[name="lm-conta"]:checked'),pg=document.querySelector('[name="lm-pag"]:checked');
+    Object.assign(c,{metaContaId:ct?.value||null,metaContaNome:ct?.value?ct.dataset.nome:null,
+      metaPaginaId:pg?.value||null,metaPaginaNome:pg?.value?pg.dataset.nome:null});
+    Object.keys(metaCache).filter(k=>k.startsWith(cid+':')).forEach(k=>delete metaCache[k]);
+    registrar('Ligou conta da Meta',c.nome+' — '+(c.metaContaNome||'nenhuma'));
+    await gravar(dados);fecharModal();abrirFicha(cid);aviso('Conta da Meta salva');
+  };
+  const ch=document.getElementById('lm-chave');if(ch)ch.onclick=()=>formChaveMeta(cid);
+}
+
+async function formChaveMeta(cid){
+  const c=cliDe(cid);
+  let info={};try{info=await chamarFuncao('meta',{acao:'info_chave',clienteId:cid})}catch(e){}
+  abrirModal(`<h3>Chave própria · ${esc(c.nome)}</h3>
+    <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">Só para cliente que não está no Gerenciador de Negócios da Cometa. A chave fica guardada no servidor e não aparece mais na tela.
+    ${info.propria?`<br><b>Já tem chave própria${info.expiraEm?' · vence em '+new Date(info.expiraEm+'T12:00').toLocaleDateString('pt-BR'):''}.</b>`:''}</p>
+    <div class="campo"><label>Chave de acesso (token)</label><textarea id="ck-token" placeholder="EAAG…"></textarea></div>
+    <div class="campo"><label>Vence em (se souber)</label><input type="date" id="ck-vence"></div>
+    <button class="btn" id="ck-salvar">Testar e salvar</button>
+    ${info.propria?'<button class="btn sec" style="margin-top:8px" id="ck-apagar">Voltar a usar a chave da Cometa</button>':''}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('ck-salvar').onclick=async()=>{
+    const bt=document.getElementById('ck-salvar');bt.disabled=true;bt.textContent='Testando…';
+    try{await chamarFuncao('meta',{acao:'chave',clienteId:cid,token:document.getElementById('ck-token').value,
+        expiraEm:document.getElementById('ck-vence').value||null});
+      fecharModal();aviso('Chave salva');formLigarMeta(cid)}
+    catch(e){aviso(e.message);bt.disabled=false;bt.textContent='Testar e salvar'}
+  };
+  const ap=document.getElementById('ck-apagar');
+  if(ap)ap.onclick=async()=>{try{await chamarFuncao('meta',{acao:'apagar_chave',clienteId:cid});fecharModal();aviso('Voltou para a chave da Cometa')}catch(e){aviso(e.message)}};
+}
+document.getElementById('b-voltar').onclick=()=>ir('clientes');
+document.getElementById('b-add-cli').onclick=()=>{ir('lancar');document.getElementById('sel-cli').value=clienteAberto};
+
+/* --- WhatsApp: status do cliente --- */
+document.getElementById('b-zap').onclick=()=>{
+  const c=cliDe(clienteAberto),p=abertas(clienteAberto);
+  const f=fechadas(clienteAberto).filter(a=>isoDe(new Date(a.feitaEm)).slice(0,7)===mesAtual());
+  const txt=`*${c.nome}* — status ${new Date().toLocaleDateString('pt-BR')}\n\n`+
+    `✅ Entregue este mês (${f.length})\n`+(f.length?f.map(a=>`• ${a.titulo} — ${curta(a.feitaEm)}`).join('\n'):'• nada ainda')+
+    `\n\n🔵 Em andamento (${p.length})\n`+(p.length?p.map(a=>`• ${a.titulo}${a.data?' — '+selo(a.data).txt:''}`).join('\n'):'• nada em aberto')+
+    `\n\n— Cometa Digital`;
+  const zap=(c.contato||'').replace(/\D/g,'');
+  abrirModal(`<h3>Status para enviar</h3>
+    <textarea id="tx-zap" style="width:100%;min-height:210px;padding:12px;border-radius:12px;border:1px solid var(--linha);font-size:13px">${esc(txt)}</textarea>
+    <div class="dupla" style="margin-top:12px">
+      <button class="btn sec" id="b-copiar">Copiar texto</button>
+      <a class="btn esc" style="text-align:center;text-decoration:none;display:block;color:#fff"
+         href="https://wa.me/${zap?(zap.length>11?zap:'55'+zap):''}?text=${encodeURIComponent(txt)}" target="_blank">Abrir no WhatsApp</a>
+    </div>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
+  document.getElementById('b-copiar').onclick=()=>{
+    const t=document.getElementById('tx-zap');t.select();
+    navigator.clipboard?.writeText(t.value);fecharModal();aviso('Texto copiado');
+  };
+};
+
+/* --- Relatório do mês --- */
+function carregarJsPDF(){
+  return new Promise((res,rej)=>{
+    if(window.jspdf){res();return}
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload=res;s.onerror=rej;document.head.appendChild(s);
+  });
+}
+document.getElementById('b-relat').onclick=()=>{
+  const c=cliDe(clienteAberto);
+  const f=fechadas(clienteAberto).filter(a=>isoDe(new Date(a.feitaEm)).slice(0,7)===mesAtual());
+  const porTipo={};f.forEach(a=>porTipo[a.titulo]=(porTipo[a.titulo]||0)+1);
+  const mes=new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+  abrirModal(`<h3>${esc(c.nome)} — ${mes}</h3>
+    <div class="kpi" style="margin-bottom:12px"><div class="rot">Entregas no mês</div><div class="num">${f.length}</div></div>
+    ${Object.keys(porTipo).length?`<div class="painel">${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
+      `<div class="item"><div class="corpo"><div class="tit">${esc(t)}</div></div><span class="tag">${n}x</span></div>`).join('')}</div>`
+      :`<div class="nada">Nenhuma entrega registrada neste mês.</div>`}
+    <button class="btn sec" style="margin-top:12px" id="b-relat-pdf">Baixar PDF</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
+  document.getElementById('b-relat-pdf').onclick=async()=>{
+    const bt=document.getElementById('b-relat-pdf');bt.disabled=true;bt.textContent='Gerando…';
+    try{await carregarJsPDF()}catch(e){bt.disabled=false;bt.textContent='Baixar PDF';return aviso('Sem internet para gerar o PDF')}
+    const {jsPDF}=window.jspdf;
+    const doc=new jsPDF();
+    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(75,59,228);
+    doc.text('Cometa Digital',14,20);
+    doc.setFontSize(13);doc.setFont('helvetica','normal');doc.setTextColor(22,27,61);
+    doc.text(c.nome+' — '+mes,14,30);
+    doc.setDrawColor(225,228,240);doc.line(14,35,196,35);
+    doc.setFontSize(11);
+    doc.text('Entregas no mês: '+f.length,14,46);
+    let y=57;
+    const linhas=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+    if(linhas.length){
+      linhas.forEach(([t,n])=>{doc.text('• '+t+' — '+n+'x',14,y);y+=8});
+    }else{doc.text('Nenhuma entrega registrada neste mês.',14,y);y+=8}
+    doc.setFontSize(9);doc.setTextColor(120,126,150);
+    doc.text('Gerado em '+new Date().toLocaleDateString('pt-BR')+' pelo Cometa OS',14,286);
+    doc.save('relatorio-'+c.nome.replace(/\s+/g,'-').toLowerCase()+'-'+mesAtual()+'.pdf');
+    bt.disabled=false;bt.textContent='Baixar PDF';
+  };
+};
+
+/* --- cadastro/edição de cliente --- */
+function formCliente(c){
+  c=c||{};
+  abrirModal(`<h3>${c.id?'Editar cliente':'Novo cliente'}</h3>
+    <div class="campo"><label>Nome</label><input id="c-nome" value="${esc(c.nome||'')}"></div>
+    <div class="campo"><label>WhatsApp</label><input id="c-contato" placeholder="35 9 9999-9999" value="${esc(c.contato||'')}"></div>
+    <div class="dupla">
+      <div class="campo"><label>Mensalidade (R$)</label><input id="c-mens" type="number" value="${esc(c.mensalidade||'')}"></div>
+      <div class="campo"><label>Vence dia</label><input id="c-venc" type="number" min="1" max="31" value="${esc(c.diaVenc||'')}"></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Situação</label><select id="c-status">
+        <option value="ativo" ${c.status!=='pausado'?'selected':''}>Ativo</option>
+        <option value="pausado" ${c.status==='pausado'?'selected':''}>Pausado</option></select></div>
+    </div>
+    <button class="btn" id="c-salvar">Salvar</button>
+    ${c.id?`<button class="btn sec" style="margin-top:8px" id="c-excluir">Excluir cliente</button>`:''}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('c-salvar').onclick=async()=>{
+    const nome=document.getElementById('c-nome').value.trim();
+    if(!nome)return aviso('Escreva o nome do cliente');
+    const dadosCli={nome,contato:document.getElementById('c-contato').value.trim(),
+      mensalidade:document.getElementById('c-mens').value,diaVenc:document.getElementById('c-venc').value,
+      status:document.getElementById('c-status').value};
+    if(c.id)Object.assign(dados.clientes.find(x=>x.id===c.id),dadosCli);
+    else dados.clientes.push({id:uid(),criadoEm:Date.now(),...dadosCli});
+    registrar(c.id?'Editou cliente':'Cadastrou cliente',nome);
+    await gravar(dados);fecharModal();
+    clienteAberto&&c.id?abrirFicha(c.id):ir('clientes');
+    aviso(c.id?'Cadastro atualizado':'Cliente cadastrado');
+  };
+  if(c.id)document.getElementById('c-excluir').onclick=async()=>{
+    if(!confirm('Excluir '+c.nome+' e todas as atividades?'))return;
+    dados.clientes=dados.clientes.filter(x=>x.id!==c.id);
+    dados.atividades=dados.atividades.filter(a=>a.clienteId!==c.id);
+    registrar('Excluiu cliente',c.nome);
+    await gravar(dados);fecharModal();ir('clientes');aviso('Cliente excluído');
+  };
+}
+document.getElementById('b-novo-cli').onclick=()=>formCliente();
+document.getElementById('b-edit-cli').onclick=()=>formCliente(cliDe(clienteAberto));
+
+/* ============ AGENDA ============ */
+function pintarAgenda(){
+  const ab=todasAbertas();
+  let html='';
+  for(let i=0;i<14;i++){
+    const dia=somaDias(hojeISO(),i);
+    const itens=ab.filter(a=>a.data===dia||(i===0&&a.data&&a.data<hojeISO()));
+    if(!itens.length)continue;
+    const dt=new Date(dia+'T00:00');
+    const rot=i===0?'Hoje':i===1?'Amanhã':dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
+    html+=`<div class="rotulo">${rot}</div><div class="painel">${itens.map(a=>linha(a,true)).join('')}</div>`;
+  }
+  const el=document.getElementById('agenda');
+  el.innerHTML=html||`<div class="nada"><b>Duas semanas livres</b>Nenhuma atividade com data marcada.</div>`;
+  ligarLinhas(el);
+  bloco(ab.filter(a=>!a.data),'sem-data','<b>Tudo com data</b>Nenhuma atividade solta.');
+}
+
+/* ============ LANÇAR ============ */
+function montarLancar(){
+  const sel=document.getElementById('sel-cli'),atual=sel.value;
+  sel.innerHTML=ordenados().map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join('')+'<option value="__novo">+ Cadastrar cliente…</option>';
+  if(atual&&atual!=='__novo')sel.value=atual;
+  document.getElementById('in-resp').innerHTML='<option value="">—</option>'+dados.equipe.map(p=>`<option>${esc(p)}</option>`).join('');
+  document.getElementById('chips').innerHTML=dados.servicos.map(s=>`<button class="chip" aria-pressed="false">${esc(s)}</button>`).join('');
+  document.getElementById('chips').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{
+    document.getElementById('in-tit').value=b.textContent;
+    document.getElementById('chips').querySelectorAll('.chip').forEach(o=>o.setAttribute('aria-pressed',o===b));
+  });
+  pintarFila();
+}
+document.getElementById('sel-cli').onchange=e=>{if(e.target.value==='__novo'){e.target.selectedIndex=0;formCliente()}};
+document.querySelectorAll('#datas-rapidas .chip').forEach(b=>b.onclick=()=>{
+  const v=b.dataset.dia;
+  document.getElementById('in-data').value=v==='x'?'':somaDias(hojeISO(),Number(v));
+});
+function limpar(){['in-tit','in-obs','in-data'].forEach(i=>document.getElementById(i).value='');
+  document.getElementById('in-prio').value='normal';document.getElementById('in-rec').value='';
+  document.getElementById('chips').querySelectorAll('.chip').forEach(o=>o.setAttribute('aria-pressed','false'))}
+function pegar(){
+  const cid=document.getElementById('sel-cli').value,tit=document.getElementById('in-tit').value.trim();
+  if(!cid||cid==='__novo'){aviso('Escolha o cliente');return null}
+  if(!tit){aviso('Escreva o serviço');return null}
+  return {clienteId:cid,titulo:tit,data:document.getElementById('in-data').value||null,
+    prioridade:document.getElementById('in-prio').value,responsavel:document.getElementById('in-resp').value,
+    recorrencia:document.getElementById('in-rec').value||null,obs:document.getElementById('in-obs').value.trim()};
+}
+document.getElementById('b-fila').onclick=()=>{const x=pegar();if(!x)return;fila.push(x);limpar();pintarFila()};
+function pintarFila(){
+  document.getElementById('fila').innerHTML=fila.map((f,i)=>`
+    <div class="fila-item"><span><b>${esc(nomeCli(f.clienteId))}</b> — ${esc(f.titulo)}${f.data?' · '+selo(f.data).txt:''}${f.recorrencia?' · repete':''}</span>
+    <button class="mini perigo" data-i="${i}">tirar</button></div>`).join('');
+  document.getElementById('fila').querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>{fila.splice(+b.dataset.i,1);pintarFila()});
+}
+document.getElementById('b-salvar').onclick=async()=>{
+  if(document.getElementById('in-tit').value.trim()){const x=pegar();if(x)fila.push(x)}
+  if(!fila.length)return aviso('Nada para salvar ainda');
+  fila.forEach(f=>dados.atividades.push({id:uid(),...f,criadoEm:Date.now(),feitaEm:null}));
+  const n=fila.length;fila=[];limpar();pintarFila();
+  registrar('Lançou atividades',n+' atividade'+(n>1?'s':''));
+  await gravar(dados);aviso(n+' atividade'+(n>1?'s':'')+' lançada'+(n>1?'s':''));
+  ir(pode('ver_geral')?'geral':'minhas');
+};
+
+/* ============ FINANCEIRO ============ */
+let mesFin=mesAtual();
+const reais=v=>'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const chavePg=(cid,mes)=>cid+':'+mes;
+const pago=(cid,mes)=>!!dados.pagamentos[chavePg(cid,mes)];
+function nomeMes(m){const [a,mm]=m.split('-');
+  return new Date(a,mm-1,1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}).replace(/^./,x=>x.toUpperCase())}
+function mudaMes(n){const [a,m]=mesFin.split('-').map(Number);const d=new Date(a,m-1+n,1);
+  mesFin=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');pintarFinanceiro()}
+document.getElementById('b-mes-ant').onclick=()=>mudaMes(-1);
+document.getElementById('b-mes-prox').onclick=()=>mudaMes(1);
+
+async function alternarPg(cid){
+  const k=chavePg(cid,mesFin);
+  if(dados.pagamentos[k]){delete dados.pagamentos[k];registrar('Desfez pagamento',cliDe(cid).nome+' — '+nomeMes(mesFin))}
+  else{dados.pagamentos[k]=Date.now();registrar('Marcou pagamento recebido',cliDe(cid).nome+' — '+nomeMes(mesFin))}
+  await gravar(dados);pintarFinanceiro();
+}
+function cobrarZap(cid){
+  const c=cliDe(cid);
+  const txt=`Oi! Passando pra lembrar da mensalidade de ${nomeMes(mesFin).toLowerCase()} — ${reais(c.mensalidade)}, vencimento dia ${c.diaVenc||'—'}.\n\nQualquer coisa é só chamar. Obrigado!\n\n— Cometa Digital`;
+  const z=(c.contato||'').replace(/\D/g,'');
+  window.open('https://wa.me/'+(z?(z.length>11?z:'55'+z):'')+'?text='+encodeURIComponent(txt),'_blank');
+}
+function pintarFinanceiro(){
+  const ativos=dados.clientes.filter(c=>c.status!=='pausado'&&Number(c.mensalidade)>0);
+  const total=ativos.reduce((s,c)=>s+Number(c.mensalidade),0);
+  const recebidos=ativos.filter(c=>pago(c.id,mesFin));
+  const recebido=recebidos.reduce((s,c)=>s+Number(c.mensalidade),0);
+  const hojeDia=new Date().getDate(), mesCorrente=mesFin===mesAtual();
+  const vencidos=ativos.filter(c=>!pago(c.id,mesFin)&&(mesFin<mesAtual()||(mesCorrente&&Number(c.diaVenc)<hojeDia)));
+
+  document.getElementById('fin-sub').textContent=nomeMes(mesFin)+' · '+ativos.length+' contratos ativos';
+  document.getElementById('fin-kpis').innerHTML=`
+    <div class="kpi"><div class="rot">Previsto</div><div class="num">${reais(total).replace(',00','')}</div><div class="pe">carteira do mês</div></div>
+    <div class="kpi verde"><div class="rot">Recebido</div><div class="num">${reais(recebido).replace(',00','')}</div><div class="pe">${recebidos.length} de ${ativos.length} pagos</div></div>
+    <div class="kpi ${vencidos.length?'alerta':''}"><div class="rot">Em atraso</div><div class="num">${vencidos.length}</div><div class="pe">${reais(vencidos.reduce((s,c)=>s+Number(c.mensalidade),0)).replace(',00','')}</div></div>
+    <div class="kpi"><div class="rot">A receber</div><div class="num">${reais(total-recebido).replace(',00','')}</div><div class="pe">falta entrar</div></div>`;
+
+  const cartao=c=>{
+    const p=pago(c.id,mesFin);
+    const atrasado=!p&&(mesFin<mesAtual()||(mesCorrente&&Number(c.diaVenc)<hojeDia));
+    return `<div class="item">
+      <div class="corpo">
+        <div class="tit">${esc(c.nome)}</div>
+        <div class="sub"><span class="tag ${p?'rec':(atrasado?'atraso':'')}">${p?'pago':(atrasado?'em atraso':'a vencer')}</span>
+          <span class="mono">${reais(c.mensalidade)}</span><span>dia ${esc(c.diaVenc||'—')}</span></div>
+      </div>
+      ${p||!pode('editar_financeiro')?'':`<button class="mini" data-cobrar="${c.id}">cobrar</button>`}
+      ${pode('editar_financeiro')?`<button class="${p?'mini':'ok'}" data-pg="${c.id}">${p?'desfazer':'recebi'}</button>`:''}
+    </div>`;
+  };
+  const el=document.getElementById('fin-vencidos');
+  el.innerHTML=vencidos.length?`<div class="rotulo">Passou do dia e não entrou</div>
+    <div class="painel">${vencidos.map(cartao).join('')}</div>`:'';
+
+  const dias=[...new Set(ativos.map(c=>Number(c.diaVenc)||0))].sort((a,b)=>a-b);
+  document.getElementById('fin-dias').innerHTML=dias.map(d=>{
+    const gente=ativos.filter(c=>(Number(c.diaVenc)||0)===d).sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+    const soma=gente.reduce((s,c)=>s+Number(c.mensalidade),0);
+    return `<div class="rotulo">Dia ${d||'sem data'} · ${gente.length} clientes · ${reais(soma).replace(',00','')}</div>
+      <div class="painel">${gente.map(cartao).join('')}</div>`;
+  }).join('');
+
+  document.querySelectorAll('[data-pg]').forEach(b=>b.onclick=()=>alternarPg(b.dataset.pg));
+  document.querySelectorAll('[data-cobrar]').forEach(b=>b.onclick=()=>cobrarZap(b.dataset.cobrar));
+}
+
+/* ============ EQUIPE ============ */
+let equipe=[];
+async function carregarEquipe(){
+  if(!naNuvem)return[];
+  const {data,error}=await sb.from('perfis').select('*').order('nome');
+  if(error){console.error(error);return[]}
+  return data||[];
+}
+async function pintarEquipe(){
+  const alvo=document.getElementById('lista-equipe');
+  alvo.innerHTML='<div class="nada">Carregando…</div>';
+  equipe=await carregarEquipe();
+  if(!equipe.length){alvo.innerHTML='<div class="nada"><b>Ninguém cadastrado</b>Crie o primeiro acesso.</div>';return}
+  alvo.innerHTML=`<div class="painel">${equipe.map(p=>{
+    const qtas=p.papel==='admin'?'acesso total':Object.values(p.permissoes||{}).filter(Boolean).length+' permissões';
+    return `<div class="item">
+      <div class="corpo">
+        <div class="tit">${esc(p.nome||p.email)} ${p.id===perfil.id?'<span class="tag">você</span>':''}</div>
+        <div class="sub">
+          <span class="tag ${p.papel==='admin'?'alta':''}">${p.papel==='admin'?'administrador':'operador'}</span>
+          ${p.ativo?'':'<span class="tag atraso">desativado</span>'}
+          <span>${esc(p.email||'')}</span><span>${qtas}</span>${p.whatsapp?`<span>WhatsApp ${esc(p.whatsapp)}</span>`:''}
+        </div>
+      </div>
+      <button class="mini" data-edit-user="${p.id}">editar</button>
+    </div>`}).join('')}</div>`;
+  alvo.querySelectorAll('[data-edit-user]').forEach(b=>b.onclick=()=>formUsuario(equipe.find(x=>x.id===b.dataset.editUser)));
+}
+
+function caixasPermissao(perm,papel){
+  return `<div id="cx-perms" style="${papel==='admin'?'opacity:.4;pointer-events:none':''}">
+    ${PERMISSOES.map(([k,r])=>`<label style="display:flex;gap:9px;align-items:center;padding:7px 0;font-size:14px;font-weight:400">
+      <input type="checkbox" data-perm="${k}" ${perm?.[k]?'checked':''} style="width:auto"> ${r}</label>`).join('')}
+  </div>`;
+}
+function lerPermissoes(){
+  const o={};document.querySelectorAll('[data-perm]').forEach(c=>o[c.dataset.perm]=c.checked);return o;
+}
+
+function formUsuario(p){
+  const novo=!p;p=p||{papel:'operador',permissoes:{concluir:true,criar_compromisso:true,cometinha:true},ativo:true};
+  abrirModal(`<h3>${novo?'Novo acesso':'Editar acesso'}</h3>
+    <div class="campo"><label>Nome</label><input id="u-nome" value="${esc(p.nome||'')}"></div>
+    <div class="campo"><label>E-mail</label><input id="u-email" type="email" value="${esc(p.email||'')}" ${novo?'':'disabled'}></div>
+    ${novo?`<div class="campo"><label>Senha provisória</label><input id="u-senha" type="text" placeholder="mínimo 6 caracteres"></div>`:''}
+    <div class="campo"><label>WhatsApp (para falar com o Cometinha)</label><input id="u-zap" type="tel" placeholder="35 9 9999-9999" value="${esc(p.whatsapp||'')}"></div>
+    <div class="campo"><label>Papel</label><select id="u-papel">
+      <option value="operador" ${p.papel!=='admin'?'selected':''}>Operador</option>
+      <option value="admin" ${p.papel==='admin'?'selected':''}>Administrador (acesso total)</option>
+    </select></div>
+    <div class="campo"><label>Pode fazer</label>${caixasPermissao(p.permissoes,p.papel)}</div>
+    ${novo?'':`<div class="campo"><label>Situação</label><select id="u-ativo">
+      <option value="1" ${p.ativo?'selected':''}>Ativo</option>
+      <option value="0" ${p.ativo?'':'selected'}>Bloqueado</option></select></div>`}
+    <button class="btn" id="u-salvar">${novo?'Criar acesso':'Salvar'}</button>
+    ${novo||p.id===perfil.id?'':`<button class="btn sec" style="margin-top:8px" id="u-remover">Remover acesso</button>`}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+
+  document.getElementById('u-papel').onchange=e=>{
+    const cx=document.getElementById('cx-perms');
+    const admin=e.target.value==='admin';
+    cx.style.opacity=admin?.4:1;cx.style.pointerEvents=admin?'none':'auto';
+  };
+
+  document.getElementById('u-salvar').onclick=async()=>{
+    const nome=document.getElementById('u-nome').value.trim();
+    const papel=document.getElementById('u-papel').value;
+    const permissoes=papel==='admin'?{}:lerPermissoes();
+    const whatsapp=document.getElementById('u-zap').value.trim()||null;
+    if(!nome)return aviso('Escreva o nome');
+    if(whatsapp&&whatsapp.replace(/\D/g,'').length<10)return aviso('WhatsApp com DDD, ex.: 35 9 9999-9999');
+    const bt=document.getElementById('u-salvar');bt.disabled=true;bt.textContent='Salvando…';
+
+    if(novo){
+      const email=document.getElementById('u-email').value.trim();
+      const senha=document.getElementById('u-senha').value;
+      if(!email||senha.length<6){bt.disabled=false;bt.textContent='Criar acesso';return aviso('E-mail e senha de 6+ caracteres')}
+      /* cliente separado para não derrubar a sessão de quem está criando */
+      const aux=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,
+        {auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+      const {data,error}=await aux.auth.signUp({email,password:senha});
+      if(error||!data.user){bt.disabled=false;bt.textContent='Criar acesso';return aviso('Não deu: '+(error?.message||'erro ao criar'))}
+      const {error:e2}=await sb.from('perfis').insert({id:data.user.id,nome,email,papel,permissoes,ativo:true,whatsapp});
+      if(e2){bt.disabled=false;bt.textContent='Criar acesso';return aviso('Usuário criado, mas o perfil falhou: '+e2.message)}
+      if(!dados.equipe.includes(nome))dados.equipe.push(nome);
+      registrar('Criou acesso de equipe',nome);
+      await gravar(dados);
+      fecharModal();pintarEquipe();
+      aviso(data.session?'Acesso criado':'Acesso criado — confirme o e-mail no Supabase se o login não passar');
+    }else{
+      const {error}=await sb.from('perfis').update({nome,papel,permissoes,whatsapp,
+        ativo:document.getElementById('u-ativo').value==='1'}).eq('id',p.id);
+      bt.disabled=false;bt.textContent='Salvar';
+      if(error)return aviso('Erro: '+error.message);
+      registrar('Editou acesso de equipe',nome);
+      await gravar(dados);fecharModal();pintarEquipe();aviso('Acesso atualizado');
+    }
+  };
+
+  const rem=document.getElementById('u-remover');
+  if(rem)rem.onclick=async()=>{
+    if(!confirm('Remover o acesso de '+(p.nome||p.email)+'? Ele não vai mais conseguir entrar.'))return;
+    const {error}=await sb.from('perfis').delete().eq('id',p.id);
+    if(error)return aviso('Erro: '+error.message);
+    registrar('Removeu acesso de equipe',p.nome||p.email);
+    await gravar(dados);fecharModal();pintarEquipe();aviso('Acesso removido');
+  };
+}
+document.getElementById('b-novo-user').onclick=()=>formUsuario();
+
+/* ============ HISTÓRICO ============ */
+function pintarHistorico(){
+  const log=(dados.log||[]).slice(0,100);
+  const el=document.getElementById('lista-log');
+  el.innerHTML=log.length?`<div class="painel">${log.map(l=>`
+    <div class="item"><div class="corpo">
+      <div class="tit">${esc(l.acao)}${l.detalhe?' · '+esc(l.detalhe):''}</div>
+      <div class="sub"><span class="dono">${esc(l.quem)}</span><span class="tag">${new Date(l.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</span></div>
+    </div></div>`).join('')}</div>`
+    :`<div class="nada"><b>Nada por aqui ainda</b>As ações da equipe vão aparecer neste histórico.</div>`;
+}
+
+/* ============ AGENDA EXTERNA ============ */
+const TIPOS_COMP=['Captação','Reunião','Visita','Gravação','Entrega'];
+const compAbertos=()=>(dados.compromissos||[]).filter(c=>!c.feitoEm)
+  .sort((a,b)=>((a.data||'9999')+(a.hora||'99:99')).localeCompare((b.data||'9999')+(b.hora||'99:99')));
+const compFeitos=()=>(dados.compromissos||[]).filter(c=>c.feitoEm).sort((a,b)=>b.feitoEm-a.feitoEm);
+const mapaLink=l=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(l);
+
+function cartaoComp(c){
+  const s=c.data?selo(c.data):null;
+  const cli=c.clienteId?nomeCli(c.clienteId):'';
+  return `<div class="item" data-comp="${c.id}">
+    <div class="corpo">
+      <div class="tit">${c.hora?`<span class="mono" style="color:var(--cometa)">${esc(c.hora)}</span> · `:''}${esc(c.tipo||'Compromisso')}${cli?` · <span class="dono">${esc(cli)}</span>`:''}</div>
+      <div class="sub">
+        ${s?`<span class="tag ${s.cls}">${s.txt}</span>`:'<span class="tag">sem data</span>'}
+        ${c.local?`<a href="${mapaLink(c.local)}" target="_blank" style="color:var(--cometa);font-weight:600">${esc(c.local)}</a>`:''}
+        ${c.responsavel?`<span>${esc(c.responsavel)}</span>`:''}
+        ${c.obs?`<span>${esc(c.obs)}</span>`:''}
+      </div>
+    </div>
+    ${pode('criar_compromisso')?`<button class="mini" data-edit-comp="${c.id}">editar</button>`:''}
+    ${pode('concluir')||pode('criar_compromisso')?`<button class="ok" data-ok-comp="${c.id}">feito</button>`:''}
+  </div>`;
+}
+function ligarComp(raiz){
+  raiz.querySelectorAll('[data-ok-comp]').forEach(b=>b.onclick=async()=>{
+    const c=dados.compromissos.find(x=>x.id===b.dataset.okComp);
+    c.feitoEm=Date.now();c.feitoPor=perfil.nome;
+    registrar('Concluiu compromisso',(c.tipo||'Compromisso')+(c.clienteId?' — '+nomeCli(c.clienteId):''));
+    await gravar(dados);redesenhar();
+    aviso('Compromisso concluído',async()=>{c.feitoEm=null;await gravar(dados);redesenhar()});
+  });
+  raiz.querySelectorAll('[data-edit-comp]').forEach(b=>b.onclick=()=>
+    formCompromisso(dados.compromissos.find(x=>x.id===b.dataset.editComp)));
+}
+
+function pintarExterna(){
+  const abertos=compAbertos().filter(c=>pode('ver_compromissos')||c.responsavel===perfil.nome);
+  const el=document.getElementById('externa-lista');
+  if(!abertos.length){el.innerHTML='<div class="nada"><b>Nada marcado</b>Sem captações ou reuniões na agenda.</div>'}
+  else{
+    const grupos={};
+    abertos.forEach(c=>{(grupos[c.data||'sem']=grupos[c.data||'sem']||[]).push(c)});
+    el.innerHTML=Object.entries(grupos).map(([d,itens])=>{
+      let rot='Sem data';
+      if(d!=='sem'){
+        const n=diasAte(d),dt=new Date(d+'T00:00');
+        rot=n===0?'Hoje':n===1?'Amanhã':n<0?'Atrasado · '+dt.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})
+          :dt.toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'2-digit'});
+      }
+      return `<div class="rotulo">${rot}</div><div class="painel">${itens.map(cartaoComp).join('')}</div>`;
+    }).join('');
+  }
+  ligarComp(el);
+  const f=compFeitos().slice(0,15).filter(c=>pode('ver_compromissos')||c.responsavel===perfil.nome);
+  document.getElementById('externa-feitos').innerHTML=f.length
+    ? `<div class="painel">${f.map(c=>`<div class="item"><div class="corpo">
+        <div class="tit">${esc(c.tipo||'Compromisso')}${c.clienteId?' · '+esc(nomeCli(c.clienteId)):''}</div>
+        <div class="sub"><span class="tag">${curta(c.feitoEm)}</span>${c.feitoPor?`<span>${esc(c.feitoPor)}</span>`:''}${c.local?`<span>${esc(c.local)}</span>`:''}</div>
+      </div></div>`).join('')}</div>`
+    : '<div class="nada" style="padding:20px">Nada realizado ainda.</div>';
+  esconder('b-novo-comp',pode('criar_compromisso'));
+}
+
+function formCompromisso(c){
+  const novo=!c;c=c||{tipo:'Captação',data:hojeISO(),hora:'09:00'};
+  abrirModal(`<h3>${novo?'Novo compromisso':'Editar compromisso'}</h3>
+    <div class="campo"><label>Tipo</label><select id="k-tipo">
+      ${TIPOS_COMP.map(t=>`<option ${c.tipo===t?'selected':''}>${t}</option>`).join('')}</select></div>
+    <div class="campo"><label>Cliente</label><select id="k-cli">
+      <option value="">— sem cliente —</option>
+      ${ordenados().map(x=>`<option value="${x.id}" ${c.clienteId===x.id?'selected':''}>${esc(x.nome)}</option>`).join('')}
+    </select></div>
+    <div class="dupla">
+      <div class="campo"><label>Data</label><input type="date" id="k-data" value="${esc(c.data||'')}"></div>
+      <div class="campo"><label>Horário</label><input type="time" id="k-hora" value="${esc(c.hora||'')}"></div>
+    </div>
+    <div class="campo"><label>Local / endereço</label><input id="k-local" placeholder="Rua, número, bairro" value="${esc(c.local||'')}"></div>
+    <div class="campo"><label>Responsável</label><select id="k-resp">
+      <option value="">—</option>
+      ${dados.equipe.map(p=>`<option ${c.responsavel===p?'selected':''}>${esc(p)}</option>`).join('')}</select></div>
+    <div class="campo"><label>Observação</label><textarea id="k-obs" placeholder="Levar tripé, falar com o gerente...">${esc(c.obs||'')}</textarea></div>
+    <button class="btn" id="k-salvar">${novo?'Marcar':'Salvar'}</button>
+    ${novo?'':`<button class="btn sec" style="margin-top:8px" id="k-excluir">Excluir compromisso</button>`}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+
+  document.getElementById('k-salvar').onclick=async()=>{
+    const novoC={
+      tipo:document.getElementById('k-tipo').value,
+      clienteId:document.getElementById('k-cli').value||null,
+      data:document.getElementById('k-data').value||null,
+      hora:document.getElementById('k-hora').value||null,
+      local:document.getElementById('k-local').value.trim(),
+      responsavel:document.getElementById('k-resp').value,
+      obs:document.getElementById('k-obs').value.trim()
+    };
+    if(!novoC.data)return aviso('Escolha a data');
+    if(novo)dados.compromissos.push({id:uid(),...novoC,criadoEm:Date.now(),feitoEm:null});
+    else Object.assign(dados.compromissos.find(x=>x.id===c.id),novoC);
+    registrar(novo?'Marcou compromisso':'Editou compromisso',novoC.tipo+(novoC.clienteId?' — '+nomeCli(novoC.clienteId):''));
+    await gravar(dados);fecharModal();redesenhar();aviso(novo?'Compromisso marcado':'Compromisso atualizado');
+  };
+  const ex=document.getElementById('k-excluir');
+  if(ex)ex.onclick=async()=>{
+    if(!confirm('Excluir este compromisso?'))return;
+    dados.compromissos=dados.compromissos.filter(x=>x.id!==c.id);
+    registrar('Excluiu compromisso',(c.tipo||'Compromisso')+(c.clienteId?' — '+nomeCli(c.clienteId):''));
+    await gravar(dados);fecharModal();redesenhar();aviso('Compromisso excluído');
+  };
+}
+document.getElementById('b-novo-comp').onclick=()=>formCompromisso();
+
+/* ============ MINHAS TAREFAS ============ */
+function pintarMinhas(){
+  const eu=perfil.nome;
+  const minhasAtiv=todasAbertas().filter(a=>a.responsavel===eu);
+  const meusComp=compAbertos().filter(c=>c.responsavel===eu);
+  const feitas=dados.atividades.filter(a=>a.feitaEm&&a.feitaPor===eu&&Date.now()-a.feitaEm<7*864e5)
+    .sort((x,y)=>y.feitaEm-x.feitaEm);
+  const atrasadas=minhasAtiv.filter(a=>a.data&&diasAte(a.data)<0).length;
+
+  document.getElementById('minhas-tit').textContent='Olá, '+eu;
+  document.getElementById('minhas-sub').textContent=
+    minhasAtiv.length+' atividade'+(minhasAtiv.length===1?'':'s')+' e '+meusComp.length+' compromisso'+(meusComp.length===1?'':'s')
+    +(atrasadas?' · '+atrasadas+' em atraso':'');
+
+  const c1=document.getElementById('minhas-comp');
+  c1.innerHTML=meusComp.length?`<div class="painel">${meusComp.map(cartaoComp).join('')}</div>`
+    :'<div class="nada" style="padding:20px">Nenhum compromisso marcado para você.</div>';
+  ligarComp(c1);
+
+  bloco(minhasAtiv,'minhas-ativ','<b>Nada pendente</b>Nenhuma atividade atribuída a você.',true);
+
+  document.getElementById('minhas-feitas').innerHTML=feitas.length
+    ? `<div class="painel">${feitas.map(a=>`<div class="item"><div class="corpo">
+        <div class="tit"><span class="dono">${esc(nomeCli(a.clienteId))}</span> · ${esc(a.titulo)}</div>
+        <div class="sub"><span class="tag">${curta(a.feitaEm)}</span></div></div></div>`).join('')}</div>`
+    : '<div class="nada" style="padding:20px">Nada concluído nos últimos sete dias.</div>';
+}
+
+/* ============ AJUSTES ============ */
+function montarAjustes(){
+  document.getElementById('in-equipe').value=dados.equipe.join(', ');
+  document.getElementById('in-servicos').value=dados.servicos.join(', ');
+  document.getElementById('nota-nuvem').textContent=naNuvem
+    ? 'Nuvem ligada: os dados aparecem igual no celular e no computador.'
+    : 'Nuvem desligada: os dados ficam salvos apenas neste navegador.';
+  document.getElementById('b-sair').style.display=naNuvem?'block':'none';
+}
+document.getElementById('b-sair').onclick=()=>{if(confirm('Sair da conta neste aparelho?'))sair()};
+document.getElementById('b-salvar-aj').onclick=async()=>{
+  const lst=id=>document.getElementById(id).value.split(',').map(s=>s.trim()).filter(Boolean);
+  dados.equipe=lst('in-equipe');dados.servicos=lst('in-servicos');
+  await gravar(dados);aviso('Ajustes salvos');
+};
+document.getElementById('b-exportar').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(dados,null,2)],{type:'application/json'}));
+  a.download='cometa-os-'+hojeISO()+'.json';a.click();aviso('Backup baixado');
+};
+document.getElementById('b-importar').onclick=()=>document.getElementById('arquivo').click();
+document.getElementById('arquivo').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=async()=>{try{
+    const d=JSON.parse(r.result);
+    if(!d.clientes)throw 0;
+    dados={equipe:['Você'],servicos:dados.servicos,...d};
+    await gravar(dados);ir('geral');aviso('Backup restaurado');
+  }catch(err){aviso('Arquivo inválido — use um backup gerado aqui')}};
+  r.readAsText(f);
+};
+
+/* ============ ENTRADA ============ */
+async function entrar(){
+  const email=document.getElementById('p-email').value.trim();
+  const senha=document.getElementById('p-senha').value;
+  const erro=document.getElementById('p-erro');
+  erro.textContent='';
+  if(!email||!senha){erro.textContent='Preencha e-mail e senha.';return}
+  const bt=document.getElementById('p-entrar');bt.textContent='Entrando…';bt.disabled=true;
+  const {error}=await sb.auth.signInWithPassword({email,password:senha});
+  bt.textContent='Entrar';bt.disabled=false;
+  if(error){erro.textContent='E-mail ou senha incorretos.';return}
+  if(!await carregarPerfil()){mostrarBloqueio();return}
+  document.getElementById('porta').classList.remove('ver');
+  await abrirSistema();
+}
+document.getElementById('p-entrar').onclick=entrar;
+document.getElementById('p-senha').onkeydown=e=>{if(e.key==='Enter')entrar()};
+
+async function sair(){
+  if(sb)await sb.auth.signOut();
+  location.reload();
+}
+
+async function carregarPerfil(){
+  if(!naNuvem){perfil={id:'local',nome:'Você',papel:'admin',permissoes:{},ativo:true};return true}
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user)return false;
+  const {data,error}=await sb.from('perfis').select('*').eq('id',user.id).maybeSingle();
+  if(error)console.error(error);
+  if(!data||!data.ativo)return false;
+  perfil={...data,permissoes:data.permissoes||{}};
+  return true;
+}
+function aplicarPermissoes(){
+  esconder('b-novo-cli',pode('editar_clientes'));
+  esconder('b-edit-cli',pode('editar_clientes'));
+  esconder('b-add-cli',pode('lancar'));
+}
+
+async function abrirSistema(){
+  const s=await carregar();
+  const offline=!!s?._offline;
+  if(s)delete s._offline;
+  if(s&&s.clientes)dados={...dados,...s,pagamentos:s.pagamentos||{},compromissos:s.compromissos||[],log:s.log||[]};
+  if(naNuvem){
+    /* sem conexão: mostra a cópia do aparelho, mas não salva nada até conectar
+       (senão uma cópia velha poderia sobrescrever o banco) */
+    if(offline)setTimeout(recarregarDaNuvem,15000);
+    else{fotografar();localSet(dados)}
+  }else if(!s||!s.clientes){
+    /* modo demonstração (sem nuvem): começa com clientes de exemplo (fictícios) */
+    const h=n=>somaDias(hojeISO(),n);
+    const exemplo=[['Padaria Pão Dourado',5,900],['Academia Ritmo',10,1200],['Pizzaria Forno a Lenha',10,1100],
+      ['Ótica Visão Clara',15,850],['Pet Shop Amigo Fiel',15,700],['Clínica Sorriso',20,1500],['Hamburgueria Brasa',20,950],['Loja Bella Moda',25,800]];
+    dados.equipe=['Ana','Bruno','Carla'];
+    dados.clientes=exemplo.map(([nome,dia,valor],i)=>
+      ({id:'demo'+i,nome,contato:'35 99999-00'+String(10+i),mensalidade:valor,diaVenc:dia,status:'ativo',criadoEm:Date.now(),
+        ...(i<3?{metaContaId:String(1000+i),metaContaNome:nome+' · Anúncios',metaPaginaId:'pg'+i,metaPaginaNome:nome}:{})}));
+    const at=(c,titulo,data,resp,extra)=>({id:uid(),clienteId:'demo'+c,titulo,data,responsavel:resp,prioridade:'normal',obs:'',recorrencia:null,criadoEm:Date.now(),feitaEm:null,...extra});
+    dados.atividades=[
+      at(0,'Postagem do feed',h(-2),'Ana',{prioridade:'alta'}),at(1,'Stories da promoção',h(-1),'Bruno'),
+      at(2,'Edição do vídeo do forno',h(0),'Carla',{prioridade:'alta'}),at(0,'Legenda do carrossel',h(0),'Ana'),
+      at(3,'Captação na loja',h(1),'Bruno'),at(4,'Relatório de tráfego',h(2),'Ana',{recorrencia:'30'}),
+      at(5,'Postagem semanal',h(3),'Carla',{recorrencia:'7'}),at(6,'Criativo para anúncio',h(5),'Bruno'),
+      at(7,'Reunião de pauta',null,'Ana'),
+      at(1,'Postagem do feed',h(-3),'Ana',{feitaEm:Date.now()-2*864e5,feitaPor:'Ana'}),
+      at(2,'Captação de fotos',h(-4),'Bruno',{feitaEm:Date.now()-3*864e5,feitaPor:'Bruno'})];
+    dados.compromissos=[
+      {id:uid(),tipo:'Captação',clienteId:'demo2',data:h(0),hora:'15:00',local:'Rua das Flores, 120',responsavel:'Bruno',obs:'Levar tripé',criadoEm:Date.now(),feitoEm:null},
+      {id:uid(),tipo:'Reunião',clienteId:'demo5',data:h(1),hora:'10:00',local:'Av. Principal, 900',responsavel:'Ana',obs:'',criadoEm:Date.now(),feitoEm:null}];
+    await gravar(dados);
+  }
+  ouvirNuvem();
+  aplicarPermissoes();
+  ir((telasVisiveis()[0]||['minhas'])[0]);
+  if(!naNuvem)sinal('local','só neste aparelho');
+  ligarCometinha();
+}
+
+/* ============ COMETINHA ============
+   Conversa por texto ou áudio. Quem pensa e mexe no CRM é a função "cometinha"
+   do servidor; o que ele mudar aparece aqui sozinho (sincronismo ao vivo). */
+const ct={aberto:false,carregou:false,ocupado:false,gravador:null,pedacos:[],timer:null};
+const $ct=id=>document.getElementById(id);
+function formatarCt(t){
+  return esc(t).replace(/\*([^*\n]+)\*/g,'<b>$1</b>').replace(/_([^_\n]+)_/g,'<i>$1</i>').replace(/\n/g,'<br>');
+}
+function bolha(de,texto,extra){
+  const d=document.createElement('div');
+  d.className='ct-m '+de;
+  d.innerHTML=(extra?`<span class="audio">${esc(extra)}</span>`:'')+formatarCt(texto);
+  $ct('ct-msgs').appendChild(d);$ct('ct-msgs').scrollTop=1e9;return d;
+}
+function pensando(on){
+  const ja=document.querySelector('.ct-pensando');
+  if(on&&!ja){const d=document.createElement('div');d.className='ct-pensando';d.innerHTML='<i></i><i></i><i></i> Cometinha está pensando';$ct('ct-msgs').appendChild(d);$ct('ct-msgs').scrollTop=1e9}
+  if(!on&&ja)ja.remove();
+}
+function falar(t){
+  if(!$ct('ct-falar').checked||!window.speechSynthesis)return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t.replace(/[*_•]/g,'').replace(/R\$\s?/g,'reais ').slice(0,1200));
+  u.lang='pt-BR';u.rate=1.05;speechSynthesis.speak(u);
+}
+function boasVindas(){
+  const cl=ordenados().filter(c=>c.status!=='pausado'),c1=cl[0]?.nome||'o cliente',c2=(cl[1]||cl[0])?.nome||'o cliente';
+  const pessoa=(dados.equipe||[]).find(n=>n!==perfil.nome)||'alguém da equipe';
+  bolha('ele',`Oi, ${perfil.nome.split(' ')[0]}! Sou o Cometinha. Pode escrever ou tocar no microfone e falar.\n\nExemplos:\n• *quais são minhas tarefas pra hoje?*\n• *lança uma postagem pra ${c1} na sexta, responsável ${pessoa}*\n• *quanto ${c2} gastou de anúncio essa semana?*`);
+}
+async function abrirCt(){
+  ct.aberto=true;$ct('ct').classList.add('ver');$ct('ct-texto').focus();
+  if(ct.carregou)return;
+  ct.carregou=true;
+  try{
+    const r=await chamarFuncao('cometinha',{acao:'historico'});
+    $ct('ct-msgs').innerHTML='';
+    if(!r.mensagens.length)boasVindas();
+    r.mensagens.forEach(m=>bolha(m.de==='eu'?'eu':'ele',m.texto));
+  }catch(e){$ct('ct-msgs').innerHTML='';boasVindas()}
+}
+async function enviarCt(corpo,mostrar){
+  if(ct.ocupado)return;
+  ct.ocupado=true;$ct('ct-enviar').disabled=true;
+  const minha=mostrar?bolha('eu',mostrar):null;
+  pensando(true);
+  try{
+    const r=await chamarFuncao('cometinha',corpo);
+    pensando(false);
+    if(r.transcricao){
+      if(minha)minha.innerHTML='<span class="audio">🎙 áudio</span>'+formatarCt(r.transcricao);
+      else bolha('eu',r.transcricao,'🎙 áudio');
+    }
+    bolha('ele',r.resposta);falar(r.resposta);
+  }catch(e){
+    pensando(false);
+    if(minha&&corpo.audio)minha.remove();
+    bolha('erro',e.message||'Não deu certo. Tente de novo.');
+  }
+  ct.ocupado=false;$ct('ct-enviar').disabled=false;
+}
+function enviarTextoCt(){
+  const t=$ct('ct-texto').value.trim();if(!t)return;
+  $ct('ct-texto').value='';$ct('ct-texto').style.height='';
+  enviarCt({texto:t},t);
+}
+async function microfone(){
+  if(ct.gravador){ct.gravador.stop();return}
+  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)return aviso('Este navegador não grava áudio. Escreva a mensagem.');
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}
+  catch(e){return aviso('Libere o microfone para o site nas configurações do navegador.')}
+  const tipo=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg'].find(t=>MediaRecorder.isTypeSupported?.(t))||'';
+  const rec=new MediaRecorder(stream,tipo?{mimeType:tipo}:{});
+  ct.pedacos=[];ct.gravador=rec;
+  const inicio=Date.now();
+  rec.ondataavailable=e=>{if(e.data.size)ct.pedacos.push(e.data)};
+  rec.onstop=()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    clearInterval(ct.timer);$ct('ct-status').textContent='';$ct('ct-mic').classList.remove('gravando');
+    ct.gravador=null;
+    if(Date.now()-inicio<700)return aviso('Áudio muito curto');
+    const blob=new Blob(ct.pedacos,{type:rec.mimeType||tipo||'audio/webm'});
+    const fr=new FileReader();
+    fr.onload=()=>enviarCt({audio:String(fr.result).split(',')[1],mime:blob.type},'🎙 enviando áudio…');
+    fr.readAsDataURL(blob);
+  };
+  rec.start();
+  $ct('ct-mic').classList.add('gravando');
+  ct.timer=setInterval(()=>{
+    const s=Math.round((Date.now()-inicio)/1000);
+    $ct('ct-status').textContent='gravando '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+' · toque para enviar';
+    if(s>=180)rec.stop();
+  },250);
+}
+function ligarCometinha(){
+  const pode_=pode('cometinha');
+  $ct('ct-bt').classList.toggle('ver',pode_);
+  if(!pode_||ligarCometinha.feito)return;
+  ligarCometinha.feito=true;
+  $ct('ct-bt').onclick=()=>ct.aberto?fecharCt():abrirCt();
+  $ct('ct-fechar').onclick=fecharCt;
+  $ct('ct-enviar').onclick=enviarTextoCt;
+  $ct('ct-mic').onclick=microfone;
+  $ct('ct-texto').onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();enviarTextoCt()}};
+  $ct('ct-texto').oninput=e=>{e.target.style.height='';e.target.style.height=Math.min(e.target.scrollHeight,120)+'px'};
+  $ct('ct-nova').onclick=()=>{
+    if(ct.ocupado)return;
+    $ct('ct-msgs').innerHTML='';
+    enviarCt({texto:'Oi! Vamos começar uma conversa nova.',novaConversa:true},null);
+  };
+  $ct('ct-falar').checked=localStorage.getItem('ct-falar')==='1';
+  $ct('ct-falar').onchange=e=>localStorage.setItem('ct-falar',e.target.checked?'1':'0');
+}
+function fecharCt(){ct.aberto=false;$ct('ct').classList.remove('ver');if(ct.gravador)ct.gravador.stop();window.speechSynthesis?.cancel()}
+
+function mostrarBloqueio(){
+  document.getElementById('porta').classList.add('ver');
+  document.getElementById('p-erro').textContent='';
+  ['p-email','p-senha','p-entrar'].forEach(i=>document.getElementById(i).style.display='none');
+  document.querySelectorAll('.porta-card .campo').forEach(c=>c.style.display='none');
+  document.getElementById('p-bloqueado').style.display='block';
+}
+document.getElementById('p-sair').onclick=sair;
+
+(async function(){
+  if(naNuvem){
+    const {data}=await sb.auth.getSession();
+    if(!data.session){document.getElementById('porta').classList.add('ver');return}
+    if(!await carregarPerfil()){mostrarBloqueio();return}
+  }else{await carregarPerfil()}
+  await abrirSistema();
+})();
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>

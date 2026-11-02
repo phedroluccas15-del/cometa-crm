@@ -1,0 +1,11 @@
+# Configuração das funções do servidor (Supabase Edge Functions)
+
+[functions.cometinha]
+verify_jwt = true
+
+[functions.meta]
+verify_jwt = true
+
+# quem chama é a Evolution (não tem login); a segurança é o ?segredo=EVO_SEGREDO
+[functions.whatsapp]
+verify_jwt = false
