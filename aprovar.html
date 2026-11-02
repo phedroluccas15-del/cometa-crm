@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aprovação de conteúdo · Cometa Digital</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0F1330">
+<link rel="icon" href="icone.svg" type="image/svg+xml">
+<script src="config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{--noite:#0F1330;--gelo:#F3F4FA;--branco:#fff;--linha:#E1E4F0;--ink:#161B3D;--suave:#666E96;--cometa:#4B3BE4;--rastro:#FFB020;--ok:#0E9F6E;--atraso:#E5484D}
+*{box-sizing:border-box}
+body{margin:0;background:var(--gelo);color:var(--ink);font-family:'Inter',-apple-system,'Segoe UI',sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer;border:none}
+h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.02em;margin:0}
+.topo{background:var(--noite);color:#fff;padding:22px 18px 26px}
+.topo .in,.conteudo{max-width:640px;margin:0 auto}
+.marca{display:flex;align-items:center;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:#8A92C6;margin-bottom:14px}
+.risco{width:28px;height:8px;border-radius:99px;background:linear-gradient(90deg,rgba(255,176,32,0),var(--rastro) 55%,#fff)}
+.topo h1{font-size:26px;font-weight:800}
+.topo p{margin:4px 0 0;color:#B9BFE4;font-size:14px}
+.conteudo{padding:18px 14px 60px}
+.rotulo{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--suave);margin:24px 0 10px}
+.card{background:var(--branco);border:1px solid var(--linha);border-radius:18px;padding:16px;margin-bottom:14px;box-shadow:0 12px 28px -22px rgba(16,20,60,.5)}
+.card h3{font-size:19px}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}
+.tag{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;background:#EEF0F9;color:var(--suave)}
+.midia{border-radius:12px;overflow:hidden;background:#E9EBF5;margin:10px 0}
+.midia img,.midia video{display:block;width:100%;max-height:70vh;object-fit:contain;background:#000}
+.abrir{display:block;text-align:center;padding:12px;border-radius:12px;background:#EDEAFD;color:var(--cometa);font-weight:600;text-decoration:none;margin:10px 0}
+.legenda{white-space:pre-wrap;background:var(--gelo);border-radius:12px;padding:12px;font-size:14px}
+.antes{background:#FFF6E3;color:#7A5410;border-radius:12px;padding:10px 12px;font-size:13.5px;margin-top:10px}
+.botoes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.b{padding:14px;border-radius:13px;font-weight:600;font-size:15px}
+.b.sim{background:var(--ok);color:#fff}
+.b.nao{background:var(--branco);border:1px solid var(--linha)}
+.b:disabled{opacity:.5}
+textarea{width:100%;min-height:90px;border-radius:12px;border:1px solid var(--linha);padding:12px;margin-top:10px;resize:vertical}
+.ajuste{display:none}.ajuste.ver{display:block}
+.enviar{width:100%;margin-top:8px;background:var(--cometa);color:#fff}
+.feito{text-align:center;padding:16px;border-radius:14px;font-weight:600}
+.feito.ok{background:#E6F6F0;color:var(--ok)}.feito.aj{background:#FFF6E3;color:#7A5410}
+.vazio{text-align:center;color:var(--suave);padding:40px 18px;border:1px dashed var(--linha);border-radius:18px}
+.vazio b{display:block;color:var(--ink);font-family:'Bricolage Grotesque',sans-serif;font-size:18px;margin-bottom:4px}
+.rec{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--linha);font-size:14px}
+.rec:last-child{border-bottom:none}
+.erro{background:#FDECEC;color:#9B1C20;border-radius:12px;padding:12px;font-size:14px}
+.nome{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--linha);background:var(--branco)}
+</style>
+</head>
+<body>
+<div class="topo"><div class="in">
+  <div class="marca"><span class="risco"></span>COMETA DIGITAL</div>
+  <h1 id="titulo">Aprovação de conteúdo</h1>
+  <p id="sub">Carregando…</p>
+</div></div>
+<main class="conteudo" id="conteudo"></main>
+
+<script>
+/* Página que o cliente abre pelo link exclusivo (aprovar.html?c=CODIGO).
+   Mostra o que está esperando aprovação; o cliente aprova ou pede ajuste.
+   Sem Supabase configurado (modo demonstração), usa os dados salvos neste navegador. */
+const token=new URLSearchParams(location.search).get('c')||'';
+const NUVEM=!!(typeof SUPABASE_URL!=='undefined'&&SUPABASE_URL);
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const dataBR=d=>d?d.split('-').reverse().slice(0,2).join('/'):'sem data';
+const $=id=>document.getElementById(id);
+let nomeQuem=localStorage.getItem('aprov-nome')||'';
+
+/* ---- modo demonstração: lê e grava no mesmo armazenamento do CRM ---- */
+const FORMATOS={feed:'Post (feed)',carrossel:'Carrossel',reels:'Reels',video:'Vídeo',stories:'Stories',arte:'Arte / anúncio'};
+const lerDemo=()=>{try{return JSON.parse(localStorage.getItem('cometa-os:v2'))}catch(e){return null}};
+function demo(corpo){
+  const d=lerDemo();const c=d&&d.clientes.find(x=>x.token&&x.token===corpo.token);
+  if(!c)throw new Error('Link inválido ou desativado. Peça um link novo para a agência.');
+  const posts=d.postagens||[];
+  if(!corpo.decisao)return{cliente:c.nome,
+    pendentes:posts.filter(p=>p.clienteId===c.id&&p.etapa==='aprovacao').map(p=>({id:p.id,titulo:p.titulo,formato:FORMATOS[p.formato]||p.formato,
+      data:p.data,hora:p.hora,legenda:p.legenda||'',arquivo:/^https?:/.test(p.arquivo||'')?p.arquivo:null,...(p.aprovacaoComentario?{ajustePedidoAntes:p.aprovacaoComentario}:{})})),
+    recentes:posts.filter(p=>p.clienteId===c.id&&p.etapa!=='aprovacao'&&['aprovado','ajustes'].includes(p.aprovacao)).slice(-10).reverse()
+      .map(p=>({id:p.id,titulo:p.titulo,formato:FORMATOS[p.formato]||p.formato,data:p.data,decisao:p.aprovacao}))};
+  const p=posts.find(x=>x.id===corpo.postagemId&&x.clienteId===c.id);
+  if(!p||p.etapa!=='aprovacao')throw new Error('Este conteúdo já foi respondido. Atualize a página.');
+  const E=(d.etapas&&d.etapas.length?d.etapas:[{k:'edicao'},{k:'aprovacao'},{k:'agendamento'}]).map(e=>e.k);
+  p.etapa=corpo.decisao==='aprovado'?(E.includes('agendamento')?'agendamento':'publicado'):(E.includes('edicao')?'edicao':E[Math.max(0,E.indexOf('aprovacao')-1)]);
+  p.aprovacao=corpo.decisao;p.aprovacaoComentario=corpo.comentario||'';p.etapaDesde=Date.now();
+  p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:(corpo.nome||c.nome)+' (cliente)',txt:corpo.decisao==='aprovado'?'Aprovou'+(corpo.comentario?': '+corpo.comentario:''):'Pediu ajuste: '+corpo.comentario}];
+  localStorage.setItem('cometa-os:v2',JSON.stringify(d));
+  return{ok:true};
+}
+async function chamar(corpo){
+  if(!NUVEM){await new Promise(r=>setTimeout(r,250));return demo(corpo)}
+  const r=await fetch(SUPABASE_URL+'/functions/v1/aprovacao',{method:'POST',
+    headers:{'Content-Type':'application/json',apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY},body:JSON.stringify(corpo)});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.erro||'Não foi possível carregar. Tente de novo.');
+  return j;
+}
+
+function midia(url){
+  if(!url)return '';
+  const limpo=url.split('?')[0].toLowerCase();
+  if(/\.(jpe?g|png|webp|gif)$/.test(limpo))return `<div class="midia"><img src="${esc(url)}" alt=""></div>`;
+  if(/\.(mp4|mov|webm|m4v)$/.test(limpo))return `<div class="midia"><video src="${esc(url)}" controls playsinline preload="metadata"></video></div>`;
+  return `<a class="abrir" href="${esc(url)}" target="_blank" rel="noopener">Abrir o arquivo ↗</a>`;
+}
+
+async function carregar(){
+  let r;
+  try{r=await chamar({token})}
+  catch(e){$('sub').textContent='';$('conteudo').innerHTML=`<div class="erro">${esc(e.message)}</div>`;return}
+  $('titulo').textContent=r.cliente;
+  $('sub').textContent=r.pendentes.length?(r.pendentes.length===1?'1 conteúdo esperando sua aprovação':r.pendentes.length+' conteúdos esperando sua aprovação'):'Tudo respondido por aqui ✨';
+  $('conteudo').innerHTML=`
+    <div class="rotulo" style="margin-top:6px">Seu nome</div>
+    <input class="nome" id="quem" placeholder="Para a agência saber quem respondeu" value="${esc(nomeQuem)}">
+    ${r.pendentes.length?'<div class="rotulo">Para aprovar</div>':''}
+    ${r.pendentes.map(p=>`<div class="card" data-id="${esc(p.id)}">
+      <h3>${esc(p.titulo)}</h3>
+      <div class="tags"><span class="tag">${esc(p.formato)}</span><span class="tag">publica ${dataBR(p.data)}${p.hora?' às '+esc(p.hora):''}</span></div>
+      ${midia(p.arquivo)}
+      ${p.legenda?`<div class="rotulo" style="margin:12px 0 6px">Legenda</div><div class="legenda">${esc(p.legenda)}</div>`:''}
+      ${p.ajustePedidoAntes?`<div class="antes">Você tinha pedido: “${esc(p.ajustePedidoAntes)}”. Esta é a versão nova.</div>`:''}
+      <div class="botoes"><button class="b sim" data-sim>✓ Aprovar</button><button class="b nao" data-nao>Pedir ajuste</button></div>
+      <div class="ajuste"><textarea placeholder="O que precisa mudar? Seja o mais específico possível."></textarea>
+        <button class="b enviar" data-enviar>Enviar pedido de ajuste</button></div>
+    </div>`).join('')||'<div class="vazio" style="margin-top:20px"><b>Nada para aprovar agora</b>Quando a agência mandar conteúdo novo, ele aparece neste mesmo link.</div>'}
+    ${r.recentes.length?`<div class="rotulo">Respondidos recentemente</div><div class="card">${r.recentes.map(p=>`<div class="rec"><span>${esc(p.titulo)} <small style="color:var(--suave)">· ${dataBR(p.data)}</small></span>
+      <b style="color:${p.decisao==='aprovado'?'var(--ok)':'#B7791F'}">${p.decisao==='aprovado'?'aprovado':'ajuste pedido'}</b></div>`).join('')}</div>`:''}`;
+  $('quem').oninput=e=>{nomeQuem=e.target.value.trim();localStorage.setItem('aprov-nome',nomeQuem)};
+  document.querySelectorAll('.card[data-id]').forEach(card=>{
+    const id=card.dataset.id;
+    card.querySelector('[data-nao]').onclick=()=>{card.querySelector('.ajuste').classList.toggle('ver');card.querySelector('textarea').focus()};
+    const responder=async(decisao,comentario,bt)=>{
+      card.querySelectorAll('button').forEach(b=>b.disabled=true);bt.textContent='Enviando…';
+      try{
+        await chamar({token,postagemId:id,decisao,comentario,nome:nomeQuem});
+        card.querySelector('.botoes').outerHTML=`<div class="feito ${decisao==='aprovado'?'ok':'aj'}">${decisao==='aprovado'?'✓ Aprovado! A agência já foi avisada.':'Pedido de ajuste enviado. Obrigado!'}</div>`;
+        card.querySelector('.ajuste').remove();
+      }catch(e){alert(e.message);card.querySelectorAll('button').forEach(b=>b.disabled=false);bt.textContent=decisao==='aprovado'?'✓ Aprovar':'Enviar pedido de ajuste'}
+    };
+    card.querySelector('[data-sim]').onclick=e=>responder('aprovado','',e.currentTarget);
+    card.querySelector('[data-enviar]').onclick=e=>{
+      const t=card.querySelector('textarea').value.trim();
+      if(!t){card.querySelector('textarea').focus();return}
+      responder('ajustes',t,e.currentTarget);
+    };
+  });
+}
+carregar();
+</script>
+</body>
+</html>

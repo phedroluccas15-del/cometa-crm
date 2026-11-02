@@ -9,3 +9,11 @@ verify_jwt = true
 # quem chama é a Evolution (não tem login); a segurança é o ?segredo=EVO_SEGREDO
 [functions.whatsapp]
 verify_jwt = false
+
+# link de aprovação do cliente (o cliente não tem login; a segurança é o código do link)
+[functions.aprovacao]
+verify_jwt = false
+
+# rotinas automáticas (quem chama é o agendador; a segurança é o cabeçalho x-segredo)
+[functions.rotinas]
+verify_jwt = false

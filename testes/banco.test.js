@@ -38,7 +38,7 @@ test('rodar a migração de novo não duplica nada', async () => {
   assert.equal((await linhas(db, 'select count(*)::int n from clientes'))[0].n, 3);
   assert.equal((await linhas(db, 'select count(*)::int n from historico'))[0].n, 1);
   const pub = await linhas(db, `select count(*)::int n from pg_publication_tables where pubname='supabase_realtime'`);
-  assert.equal(pub[0].n, 6);
+  assert.equal(pub[0].n, 9);
 });
 
 test('banco novo, sem tabela antiga, também funciona', async () => {

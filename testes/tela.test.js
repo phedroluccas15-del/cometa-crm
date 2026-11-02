@@ -21,7 +21,7 @@ before(async () => {
       const tipo = arq.endsWith('.html') ? 'text/html' : arq.endsWith('.js') ? 'text/javascript' : 'application/octet-stream';
       let corpo = await readFile(arq);
       // nos testes, o site "acha" que está ligado a um Supabase (que é o banco local)
-      if (arq.endsWith('index.html')) corpo = corpo.toString('utf8')
+      if (arq.endsWith('config.js')) corpo = corpo.toString('utf8')
         .replace("const SUPABASE_URL = '';", "const SUPABASE_URL = 'https://teste.supabase.co';")
         .replace("const SUPABASE_KEY = '';", "const SUPABASE_KEY = 'teste';");
       res.writeHead(200, { 'Content-Type': tipo + '; charset=utf-8' }).end(corpo);
@@ -103,8 +103,13 @@ test('tela: dados migrados aparecem e o que se faz na tela vai para as tabelas',
     await pagina.fill('#in-data', '2026-11-20');
     await pagina.click('#b-salvar');
     await salvo(pagina);
-    const at = await linhas(db, `select titulo, data::text from atividades where cliente_id = $1`, [nova.id]);
+    const at = await linhas(db, `select titulo, data::text from atividades where cliente_id = $1 and titulo = 'Captação de fotos'`, [nova.id]);
     assert.deepEqual(at, [{ titulo: 'Captação de fotos', data: '2026-11-20' }]);
+    // cliente novo já nasce com o checklist de entrada
+    const check = await linhas(db, `select count(*)::int n from atividades where cliente_id = $1 and obs = 'Checklist de entrada'`, [nova.id]);
+    assert.equal(check[0].n, 6);
+    const [tk] = await linhas(db, `select token_aprovacao from clientes where id = $1`, [nova.id]);
+    assert.match(tk.token_aprovacao, /^[0-9a-f]{32}$/);
 
     // dar OK na tarefa que se repete (cria a próxima)
     await pagina.click('#nav [data-t="geral"]');
@@ -247,6 +252,63 @@ test('tela: se a pessoa não tem permissão, o banco recusa e a tela volta ao ce
     assert.equal(await pagina.evaluate(() => dados.clientes.find(c => c.id === 'c1').nome), 'Kyoto');
     // sem a permissão "cometinha", o botão não aparece
     assert.equal(await pagina.isVisible('#ct-bt'), false);
+    assert.deepEqual(erros, []);
+  } finally { await ctx.close(); }
+});
+
+test('tela: postagem no calendário, anda pelas etapas e o cliente aprova pelo link', async () => {
+  const { listar, decidir } = await import('../supabase/functions/_shared/aprovacao.ts');
+  const { consultor } = await import('./banco.js');
+  const { db, pagina, erros, ctx } = await abrir(ADMIN);
+  try {
+    const hoje = await pagina.evaluate(() => hojeISO());
+    const daqui = await pagina.evaluate(() => somaDias(hojeISO(), 5));
+    // cria pelo calendário
+    await pagina.click('#nav [data-t="calendario"]');
+    await pagina.click('#b-nova-post');
+    await pagina.selectOption('#po-cli', 'c1');
+    await pagina.fill('#po-tit', 'Rodízio de quinta');
+    await pagina.selectOption('#po-fmt', 'reels');
+    await pagina.fill('#po-data', daqui);
+    await pagina.selectOption('#po-edit', 'Lucas');
+    await pagina.click('#po-salvar');
+    await salvo(pagina);
+    const [p] = await linhas(db, `select id, etapa, formato, editor, data_publicacao::text d from postagens`);
+    assert.deepEqual([p.etapa, p.formato, p.editor, p.d], ['pauta', 'reels', 'Lucas', daqui]);
+    assert.ok((await pagina.textContent('#cal')).includes('Rodízio de quinta'));
+
+    // fila de produção: avança até a aprovação do cliente
+    await pagina.click('#nav [data-t="producao"]');
+    for (let i = 0; i < 5; i++) { await pagina.click(`.kcard [data-avanca="${p.id}"]`); await salvo(pagina); }
+    assert.equal((await linhas(db, `select etapa from postagens`))[0].etapa, 'aprovacao');
+
+    // central de comando mostra que está esperando o cliente
+    await pagina.click('#nav [data-t="geral"]');
+    assert.ok((await pagina.textContent('#bl-post-aprov')).includes('Rodízio de quinta'));
+    assert.ok((await pagina.textContent('#semaforo')).includes('Kyoto'));
+
+    // o cliente abre o link (outra aba, sem login) e pede ajuste
+    const [{ token_aprovacao: tk }] = await linhas(db, `select token_aprovacao from clientes where id='c1'`);
+    const q = consultor(db);
+    const cliente = await ctx.newPage();
+    await cliente.route(/fonts\./, r => r.abort());
+    await cliente.route(/functions\/v1\/aprovacao/, async r => {
+      const b = JSON.parse(r.request().postData() || '{}');
+      try { r.fulfill({ contentType: 'application/json', body: JSON.stringify(b.decisao ? await decidir(q, b) : await listar(q, b.token)) }); }
+      catch (e) { r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ erro: e.message }) }); }
+    });
+    await cliente.goto(url.replace('index.html', 'aprovar.html?c=' + tk));
+    await cliente.waitForSelector('.card[data-id]');
+    assert.equal(await cliente.textContent('#titulo'), 'Kyoto');
+    await cliente.fill('#quem', 'Seu Jorge');
+    await cliente.click('[data-nao]');
+    await cliente.fill('.ajuste textarea', 'Colocar o preço no começo');
+    await cliente.click('[data-enviar]');
+    await cliente.waitForSelector('.feito');
+    if (process.env.FOTOS) await cliente.screenshot({ path: process.env.FOTOS + '/aprovar-celular.png', fullPage: true });
+    const [d] = await linhas(db, `select etapa, aprovacao, aprovacao_comentario c from postagens`);
+    assert.deepEqual([d.etapa, d.aprovacao, d.c], ['edicao', 'ajustes', 'Colocar o preço no começo']);
+    assert.ok(hoje);
     assert.deepEqual(erros, []);
   } finally { await ctx.close(); }
 });

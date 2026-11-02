@@ -3,6 +3,7 @@
 import postgres from 'npm:postgres@3.4.5';
 import { carregarPerfil, type Consulta, type Perfil } from './regras.ts';
 import type { ChamarModelo } from './agente.ts';
+import { responder } from './whatsapp.ts';
 
 export const env = (k: string, padrao = '') => Deno.env.get(k) ?? padrao;
 
@@ -64,6 +65,13 @@ export const agenteCfg = () => ({
   modelo: env('OPENAI_MODEL') || undefined,
   esforco: env('OPENAI_EFFORT') || undefined,
 });
+
+/** manda WhatsApp pelo chip do Cometinha (Evolution); null se ainda não foi configurada */
+export function enviarPelaEvolution() {
+  const url = env('EVO_URL'), chave = env('EVO_KEY'), instancia = env('EVO_INSTANCIA');
+  if (!url || !chave || !instancia) return null;
+  return (numero: string, texto: string) => responder({ url, chave, instancia }, numero.replace(/\D/g, ''), texto);
+}
 
 /** envolve a função com CORS e transforma erros em resposta legível */
 export function servir(fn: (req: Request) => Promise<Response>) {

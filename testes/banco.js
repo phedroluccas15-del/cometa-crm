@@ -1,13 +1,15 @@
 // Monta um Postgres local que imita o Supabase (login, papéis, permissões)
 // para testar a migração e as regras sem tocar no banco de verdade.
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const aqui = path.dirname(fileURLToPath(import.meta.url));
-export const MIGRACAO = readFileSync(
-  path.join(aqui, '..', 'supabase', 'migrations', '20261102000000_cometa_v2.sql'), 'utf8');
+const pastaMig = path.join(aqui, '..', 'supabase', 'migrations');
+/** todas as migrações, na ordem do nome (igual o Supabase roda) */
+export const MIGRACAO = readdirSync(pastaMig).filter(f => f.endsWith('.sql')).sort()
+  .map(f => readFileSync(path.join(pastaMig, f), 'utf8')).join('\n');
 
 const IMITA_SUPABASE = `
   create role anon nologin;

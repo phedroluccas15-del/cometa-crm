@@ -197,6 +197,14 @@ export async function resumo(cfg: MetaCfg, contaId: string, periodo = '7d') {
   };
 }
 
+/** totais da conta num intervalo de datas (AAAA-MM-DD), para comparar semanas */
+export async function totaisIntervalo(cfg: MetaCfg, contaId: string, desde: string, ate: string) {
+  const ins = await graph(cfg, `${act(contaId)}/insights`, {
+    fields: CAMPOS_INSIGHTS, time_range: JSON.stringify({ since: desde, until: ate }),
+  });
+  return resultados(ins.data?.[0]);
+}
+
 export async function conjuntos(cfg: MetaCfg, campanhaId: string, periodo = '7d') {
   const dp = preset(periodo);
   const lista = await todas(cfg, `${campanhaId}/adsets`, {

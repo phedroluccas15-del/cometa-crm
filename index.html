@@ -3,21 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Cometa OS — Controle de clientes</title>
+<title>Cometa CRM</title>
 <meta name="theme-color" content="#0F1330">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icone.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone-192.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-/* ==========================================================
-   CONFIGURAÇÃO — preencha com os dados do seu projeto Supabase
-   (Project Settings › API). Enquanto ficar em branco, o sistema
-   funciona salvando só no próprio aparelho.
-   ========================================================== */
-const SUPABASE_URL = '';   /* ex.: 'https://abcdxyz.supabase.co' */
-const SUPABASE_KEY = '';   /* chave "anon public" ou "publishable" */
-</script>
+<script src="config.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -278,39 +270,148 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
   .ct-bt{bottom:calc(84px + env(safe-area-inset-bottom));right:14px;width:52px;height:52px}
   .ct{left:8px;right:8px;width:auto;max-width:none;top:10px;bottom:calc(78px + env(safe-area-inset-bottom));height:auto}
 }
+
+/* ===== produção, semáforo, calendário, kanban ===== */
+.perigo-forte{background:#FDECEC!important;color:var(--atraso)!important;border-color:#F3C6C7!important}
+.sem-resumo{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--suave);margin-bottom:10px}
+.semaforo{display:flex;flex-wrap:wrap;gap:7px}
+.sem-chip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:99px;background:var(--branco);border:1px solid var(--linha);font-size:13px;font-weight:600}
+.sem-chip i,.luz{width:9px;height:9px;border-radius:99px;display:inline-block;flex:none;vertical-align:middle}
+.sem-chip.vermelho{border-color:#F3C6C7;background:#FFF7F7}
+.vermelho i,.luz.vermelho{background:var(--atraso)}.amarelo i,.luz.amarelo{background:var(--rastro)}.verde i,.luz.verde{background:var(--ok)}
+.bola-sit{width:9px;height:9px;border-radius:99px;flex:none;background:var(--cometa)}
+.bola-sit.sit-atrasada{background:var(--atraso)}.bola-sit.sit-risco{background:var(--rastro)}.bola-sit.sit-publicada{background:var(--ok)}.bola-sit.sit-sem_data{background:#C8CDE8}
+.tag.etapa{background:#EDEAFD;color:var(--cometa)}
+.post-item .corpo{cursor:pointer}
+.post-item .ok{font-size:12px;padding:7px 10px;max-width:46%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra-carga{width:90px;height:8px;border-radius:99px;background:#EEF0F9;overflow:hidden;flex:none}
+.barra-carga i{display:block;height:100%;border-radius:99px}
+.cal-sem,.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+.cal-sem{margin:18px 0 6px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--suave);text-transform:uppercase;letter-spacing:.1em;text-align:center}
+.cal-dia{background:var(--branco);border:1px solid var(--linha);border-radius:12px;min-height:108px;padding:6px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.cal-dia.fora{opacity:.35;background:transparent}
+.cal-dia.hoje{border-color:var(--cometa);box-shadow:0 0 0 1px var(--cometa)}
+.cal-n{display:flex;justify-content:space-between;align-items:center;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--suave)}
+.cal-n button{color:var(--suave);font-weight:700;padding:0 6px;border-radius:6px;font-size:14px}
+.cal-n button:hover{background:var(--gelo);color:var(--cometa)}
+.cal-p{font-size:11.5px;text-align:left;padding:4px 6px;border-radius:7px;background:#F1F2F9;border-left:3px solid var(--cometa);line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
+.cal-p small{display:block;color:var(--suave);font-size:10px}
+.cal-p.sit-atrasada{border-color:var(--atraso);background:#FDECEC}.cal-p.sit-risco{border-color:var(--rastro);background:#FFF6E3}.cal-p.sit-publicada{border-color:var(--ok);background:#E6F6F0}
+.so-cel{display:none}
+@media(max-width:860px){.cal-sem{display:none}.cal{grid-template-columns:1fr}.cal-dia{min-height:0}.cal-dia.vazio,.cal-dia.fora{display:none}
+  .cal-p{white-space:normal;font-size:13px}.so-cel{display:inline}}
+.kanban{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.coluna{flex:0 0 252px;background:#E9EBF5;border-radius:14px;padding:8px}
+.coluna h4{margin:2px 4px 8px;font-size:11.5px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:.08em;color:var(--suave);display:flex;justify-content:space-between}
+.kcard{background:var(--branco);border-radius:11px;padding:9px 10px;margin-bottom:7px;box-shadow:var(--sombra);border-left:3px solid var(--cometa);cursor:pointer}
+.kcard.sit-atrasada{border-left-color:var(--atraso)}.kcard.sit-risco{border-left-color:var(--rastro)}
+.kcard .t{font-weight:600;font-size:13.5px}
+.kcard .s{font-size:11.5px;color:var(--suave);margin-top:4px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.kcard .ok{margin-top:8px;width:100%;padding:6px;font-size:12px}
+.vazio-col{font-size:12px;color:var(--suave);text-align:center;padding:14px 0}
+.linha-et{display:grid;grid-template-columns:1fr 64px 132px auto;gap:6px;align-items:center;margin-bottom:6px}
+.linha-et input,.linha-et select{padding:8px 10px;border-radius:10px;border:1px solid var(--linha);width:100%;background:var(--branco)}
+.eventos{font-size:12.5px;color:var(--suave);border-top:1px solid var(--linha);margin-top:14px;padding-top:10px;max-height:170px;overflow:auto}
+.eventos div{padding:3px 0}
+.sel-mini{padding:6px 9px;border-radius:9px;border:1px solid var(--linha);background:var(--branco);font-size:12px;font-weight:600;color:var(--ink);max-width:200px}
+.caixa-info{background:var(--branco);border:1px solid var(--linha);border-radius:var(--r);padding:12px 15px;box-shadow:var(--sombra);font-size:14px}
+.caixa-info p{margin:5px 0}
+.chk{display:flex!important;gap:8px;align-items:center;font-weight:400!important;font-size:14px;margin:6px 0!important}
+.chk input{width:auto!important}
+.chips-servico{display:flex;flex-wrap:wrap;gap:6px}
+.chips-servico label{display:flex;gap:6px;align-items:center;padding:6px 11px;border:1px solid var(--linha);border-radius:99px;font-size:13px;font-weight:500;margin:0;cursor:pointer}
+.chips-servico input{width:auto}
+.form-box+.form-box{margin-top:14px}
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="lateral">
-    <div class="marca"><span class="risco"></span><div><h1>Cometa OS</h1><span>controle de clientes</span></div></div>
+    <div class="marca"><span class="risco"></span><div><h1>Cometa CRM</h1><span>controle de clientes</span></div></div>
     <div class="nav" id="nav"></div>
     <div class="rodape" id="rodape"></div>
   </aside>
 
   <div class="conteudo">
-    <div class="topo-mob"><span class="risco"></span><h1>Cometa OS</h1></div>
+    <div class="topo-mob"><span class="risco"></span><h1>Cometa CRM</h1></div>
 
-    <!-- VISÃO GERAL -->
+    <!-- CENTRAL DE COMANDO -->
     <section class="tela ativa" id="t-geral">
-      <div class="cabeca"><div><h2>Visão geral</h2><p id="sub-geral"></p></div></div>
+      <div class="cabeca"><div><h2>Central de comando</h2><p id="sub-geral"></p></div>
+        <button class="mini perigo-forte" id="b-emergencia">🚨 Emergência: o que está em risco</button></div>
       <div class="grade kpis" id="kpis"></div>
-      <div class="rotulo">Atrasado</div><div id="bl-atraso"></div>
-      <div class="rotulo">Para hoje</div><div id="bl-hoje"></div>
-      <div class="rotulo">Amanhã</div><div id="bl-amanha"></div>
+      <div class="grade kpis" id="kpis2" style="margin-top:12px"></div>
+      <div class="rotulo">Semáforo dos clientes</div><div id="semaforo"></div>
+      <div class="rotulo">Postagens atrasadas</div><div id="bl-post-atraso"></div>
+      <div class="rotulo">Publicar hoje</div><div id="bl-post-hoje"></div>
+      <div class="rotulo">Esperando aprovação do cliente</div><div id="bl-post-aprov"></div>
+      <div class="rotulo">Prazos de etapa vencendo (hoje e amanhã)</div><div id="bl-prazos"></div>
+      <div class="rotulo">Clientes devendo material</div><div id="bl-materiais"></div>
+      <div class="rotulo">Carga da equipe</div><div id="bl-carga"></div>
+      <div class="rotulo">Atividades atrasadas</div><div id="bl-atraso"></div>
+      <div class="rotulo">Atividades para hoje</div><div id="bl-hoje"></div>
+      <div class="rotulo">Atividades de amanhã</div><div id="bl-amanha"></div>
       <div class="rotulo">Entregue nos últimos 7 dias</div><div id="bl-recentes"></div>
+    </section>
+
+    <!-- CALENDÁRIO -->
+    <section class="tela" id="t-calendario">
+      <div class="cabeca">
+        <div><h2>Calendário editorial</h2><p id="cal-sub"></p></div>
+        <div class="acoes"><select id="cal-cli" class="sel-mini"></select>
+          <button class="mini" id="cal-ant">←</button><button class="mini" id="cal-hoje">hoje</button><button class="mini" id="cal-prox">→</button>
+          <button class="mini" id="b-nova-post">+ Postagem</button></div>
+      </div>
+      <div class="grade kpis" id="cal-kpis"></div>
+      <div class="cal-sem"><span>dom</span><span>seg</span><span>ter</span><span>qua</span><span>qui</span><span>sex</span><span>sáb</span></div>
+      <div class="cal" id="cal"></div>
+      <div class="rotulo">Sem data de publicação</div><div id="cal-semdata"></div>
+    </section>
+
+    <!-- PRODUÇÃO -->
+    <section class="tela" id="t-producao">
+      <div class="cabeca">
+        <div><h2>Fila de produção</h2><p>Cada coluna é uma etapa. O primeiro de cada coluna é o que precisa sair primeiro.</p></div>
+        <div class="acoes">
+          <button class="f" data-pf="video">Só vídeos</button><button class="f" data-pf="tudo">Tudo</button>
+          <button class="f" data-pf="meus">Só os meus</button>
+          <button class="mini" id="b-distribuir">Distribuir automaticamente</button></div>
+      </div>
+      <div class="kanban" id="kanban"></div>
+    </section>
+
+    <!-- TRÁFEGO -->
+    <section class="tela" id="t-trafego">
+      <div class="cabeca">
+        <div><h2>Monitor de tráfego</h2><p>Só o que está fora do normal, comparado com as metas de cada cliente</p></div>
+        <button class="mini" id="b-monitorar">Verificar agora</button>
+      </div>
+      <div class="grade kpis" id="tr-kpis"></div>
+      <div class="rotulo">Exceções em aberto</div><div id="tr-alertas"></div>
+      <div class="rotulo">Contas e metas</div><div id="tr-contas"></div>
+      <div class="rotulo">Resolvidos recentemente</div><div id="tr-resolvidos"></div>
+    </section>
+
+    <!-- RELATÓRIOS -->
+    <section class="tela" id="t-relatorios">
+      <div class="cabeca">
+        <div><h2>Relatórios</h2><p id="rel-sub"></p></div>
+        <div class="acoes"><button class="mini" id="rel-ant">←</button><button class="mini" id="rel-prox">→</button></div>
+      </div>
+      <div id="rel-lista"></div>
     </section>
 
     <!-- CLIENTES -->
     <section class="tela" id="t-clientes">
       <div class="cabeca">
-        <div><h2>Clientes</h2><p>Ordem alfabética · o anel mostra o quanto do mês já foi entregue</p></div>
+        <div><h2>Clientes</h2><p>Bolinha = semáforo (vermelho atrasado, amarelo atenção, verde em dia) · o anel mostra o quanto do mês já foi entregue</p></div>
         <button class="mini" id="b-novo-cli">+ Novo cliente</button>
       </div>
       <input class="busca" id="busca" placeholder="Buscar cliente" autocomplete="off" style="margin-bottom:12px">
       <div class="filtros" id="filtros">
         <button class="f" data-f="todos" aria-pressed="true">Todos</button>
-        <button class="f" data-f="atraso" aria-pressed="false">Com atraso</button>
+        <button class="f" data-f="atraso" aria-pressed="false">🔴 Atrasados</button>
+        <button class="f" data-f="atencao" aria-pressed="false">🟡 Atenção</button>
         <button class="f" data-f="pend" aria-pressed="false">Com pendência</button>
         <button class="f" data-f="livre" aria-pressed="false">Em dia</button>
         <button class="f" data-f="pausado" aria-pressed="false">Pausados</button>
@@ -325,13 +426,18 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
         <div><h2 id="f-nome" style="font-size:30px;font-weight:800"></h2><p id="f-sub" style="color:var(--suave);font-size:14px;margin:3px 0 0"></p></div>
         <div class="acoes">
           <button class="mini" id="b-add-cli">+ Atividade</button>
+          <button class="mini" id="b-add-post">+ Postagem</button>
+          <button class="mini" id="b-aprov">Link de aprovação</button>
           <button class="mini" id="b-zap">Enviar status no WhatsApp</button>
           <button class="mini" id="b-relat">Relatório do mês</button>
           <button class="mini" id="b-edit-cli">Editar cadastro</button>
         </div>
       </div>
       <div class="rotulo">Em aberto</div><div id="f-pend"></div>
-      <div id="f-meta-caixa"><div class="rotulo">Anúncios · Meta</div><div id="f-meta"></div></div>
+      <div class="rotulo">Postagens · <span id="f-post-cont" style="text-transform:none;letter-spacing:0;font-weight:500"></span></div><div id="f-posts"></div>
+      <div class="rotulo">Materiais pedidos ao cliente</div><div id="f-materiais"></div>
+      <div id="f-meta-caixa"><div class="rotulo">Anúncios · Meta</div><div id="f-alertas"></div><div id="f-meta"></div></div>
+      <div class="rotulo">Contrato e briefing</div><div id="f-contrato"></div>
       <div class="rotulo">Histórico de entregas</div><div class="linha-tempo" id="f-hist"></div>
     </section>
 
@@ -339,6 +445,7 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
     <section class="tela" id="t-minhas">
       <div class="cabeca"><div><h2 id="minhas-tit">Minhas tarefas</h2><p id="minhas-sub"></p></div></div>
       <div class="rotulo">Compromissos marcados</div><div id="minhas-comp"></div>
+      <div class="rotulo">Postagens e vídeos esperando por você</div><div id="minhas-posts"></div>
       <div class="rotulo">Atividades para você</div><div id="minhas-ativ"></div>
       <div class="rotulo">Concluído nos últimos 7 dias</div><div id="minhas-feitas"></div>
     </section>
@@ -427,7 +534,7 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
 
     <!-- AJUSTES -->
     <section class="tela" id="t-ajustes">
-      <div class="cabeca"><div><h2>Ajustes</h2><p>Equipe, serviços e cópia de segurança</p></div></div>
+      <div class="cabeca"><div><h2>Ajustes</h2><p>Equipe, serviços, etapas, regras e cópia de segurança</p></div></div>
       <div class="form-box">
         <div class="campo"><label>Equipe (separe por vírgula)</label><input id="in-equipe"></div>
         <div class="campo"><label>Serviços do atalho (separe por vírgula)</label><input id="in-servicos"></div>
@@ -442,6 +549,31 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
         <button class="btn sec" id="b-sair">Sair da conta</button>
         <p style="font-size:12.5px;color:var(--suave);margin-top:12px" id="nota-nuvem"></p>
       </div>
+      <div class="form-box">
+        <div class="rotulo" style="margin-top:0">Etapas das postagens</div>
+        <p style="font-size:12.5px;color:var(--suave);margin:-4px 0 10px">Nome da etapa · prazo em dias antes da publicação · quem faz. “Publicado” fica sempre por último.</p>
+        <div id="aj-etapas"></div>
+        <button class="mini" id="aj-nova-etapa">+ Etapa</button>
+        <div class="rotulo">Checklist de cliente novo</div>
+        <p style="font-size:12.5px;color:var(--suave);margin:-4px 0 8px">Uma tarefa por linha: <b>tarefa | dias depois da entrada</b>. Vira atividade sozinha quando um cliente é cadastrado.</p>
+        <div class="campo"><textarea id="aj-checklist" style="min-height:130px"></textarea></div>
+        <div class="rotulo">Regras</div>
+        <div class="dupla">
+          <div class="campo"><label>Itens por pessoa antes de “sobrecarregado”</label><input id="aj-cap" type="number" min="1"></div>
+          <div class="campo"><label>Dias para “em risco”</label><input id="aj-risco" type="number" min="1"></div>
+        </div>
+        <div class="campo"><label>Quem grava/edita (para distribuir vídeos; vazio = equipe toda)</label><input id="aj-editores" placeholder="Ex.: Bruno, Carla"></div>
+        <label class="chk"><input type="checkbox" id="aj-bomdia"> Mandar “bom dia” no WhatsApp de cada pessoa com o que ela tem no dia</label>
+        <label class="chk"><input type="checkbox" id="aj-alertazap"> Avisar no WhatsApp quando o monitor achar problema nos anúncios</label>
+        <label class="chk"><input type="checkbox" id="aj-matauto"> Lembrar o cliente sozinho do material pendente (WhatsApp do Cometinha)</label>
+        <button class="btn sec" id="aj-salvar-prod" style="margin-top:10px">Salvar ajustes de produção</button>
+        <div id="aj-rotinas">
+          <div class="rotulo">Rodar agora (normalmente roda sozinho)</div>
+          <div class="acoes"><button class="mini" data-rotina="bom_dia">Mandar bom dia</button>
+            <button class="mini" data-rotina="publicacoes">Conferir publicações</button>
+            <button class="mini" data-rotina="materiais">Cobrar materiais</button></div>
+        </div>
+      </div>
     </section>
   </div>
 </div>
@@ -450,7 +582,7 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
 
 <div class="porta" id="porta">
   <div class="porta-card">
-    <div class="marca"><span class="risco"></span><div><h1>Cometa OS</h1><span style="color:var(--suave)">controle de clientes</span></div></div>
+    <div class="marca"><span class="risco"></span><div><h1>Cometa CRM</h1><span style="color:var(--suave)">controle de clientes</span></div></div>
     <div class="campo"><label for="p-email">E-mail</label><input id="p-email" type="email" autocomplete="username"></div>
     <div class="campo"><label for="p-senha">Senha</label><input id="p-senha" type="password" autocomplete="current-password"></div>
     <button class="btn" id="p-entrar">Entrar</button>
@@ -538,11 +670,20 @@ const TABELAS={
     de:r=>({id:r.id,nome:r.nome,contato:r.contato||'',mensalidade:r.mensalidade==null?'':Number(r.mensalidade),
       diaVenc:r.dia_venc==null?'':r.dia_venc,status:r.status||'ativo',criadoEm:ms(r.criado_em),
       metaContaId:r.meta_conta_id||null,metaContaNome:r.meta_conta_nome||null,
-      metaPaginaId:r.meta_pagina_id||null,metaPaginaNome:r.meta_pagina_nome||null}),
+      metaPaginaId:r.meta_pagina_id||null,metaPaginaNome:r.meta_pagina_nome||null,
+      servicosCli:Array.isArray(r.servicos)?r.servicos:[],contratoInicio:r.contrato_inicio||null,contratoFim:r.contrato_fim||null,
+      briefing:r.briefing||'',acessos:r.acessos||'',postsMes:r.posts_mes==null?'':r.posts_mes,respSocial:r.resp_social||'',
+      respTrafego:r.resp_trafego||'',token:r.token_aprovacao||null,
+      metaOrcDia:r.meta_orcamento_dia==null?'':Number(r.meta_orcamento_dia),metaCplMax:r.meta_cpl_max==null?'':Number(r.meta_cpl_max),
+      metaResDia:r.meta_resultados_dia==null?'':Number(r.meta_resultados_dia)}),
     para:c=>({id:c.id,nome:c.nome,contato:vazioNulo(c.contato),mensalidade:numOuNulo(c.mensalidade),
       dia_venc:inteiroOuNulo(c.diaVenc),status:c.status||'ativo',criado_em:isoTs(c.criadoEm||Date.now()),
       meta_conta_id:vazioNulo(c.metaContaId),meta_conta_nome:vazioNulo(c.metaContaNome),
-      meta_pagina_id:vazioNulo(c.metaPaginaId),meta_pagina_nome:vazioNulo(c.metaPaginaNome)})},
+      meta_pagina_id:vazioNulo(c.metaPaginaId),meta_pagina_nome:vazioNulo(c.metaPaginaNome),
+      servicos:c.servicosCli||[],contrato_inicio:vazioNulo(c.contratoInicio),contrato_fim:vazioNulo(c.contratoFim),
+      briefing:vazioNulo(c.briefing),acessos:vazioNulo(c.acessos),posts_mes:inteiroOuNulo(c.postsMes),
+      resp_social:vazioNulo(c.respSocial),resp_trafego:vazioNulo(c.respTrafego),token_aprovacao:vazioNulo(c.token),
+      meta_orcamento_dia:numOuNulo(c.metaOrcDia),meta_cpl_max:numOuNulo(c.metaCplMax),meta_resultados_dia:numOuNulo(c.metaResDia)})},
   atividades:{tabela:'atividades',
     de:r=>({id:r.id,clienteId:r.cliente_id,titulo:r.titulo,obs:r.obs||'',prioridade:r.prioridade||'normal',
       responsavel:r.responsavel||'',recorrencia:r.recorrencia||null,data:r.data||null,criadoEm:ms(r.criado_em),
@@ -556,14 +697,36 @@ const TABELAS={
     para:c=>({id:c.id,tipo:c.tipo||'Compromisso',cliente_id:vazioNulo(c.clienteId),data:vazioNulo(c.data),hora:vazioNulo(c.hora),
       local:vazioNulo(c.local),responsavel:vazioNulo(c.responsavel),obs:vazioNulo(c.obs),criado_em:isoTs(c.criadoEm||Date.now()),
       feito_em:isoTs(c.feitoEm),feito_por:vazioNulo(c.feitoPor)})},
+  postagens:{tabela:'postagens',
+    de:r=>({id:r.id,clienteId:r.cliente_id,titulo:r.titulo,formato:r.formato||'feed',etapa:r.etapa||'pauta',data:r.data_publicacao||null,
+      hora:r.hora||'',prioridade:r.prioridade||'normal',responsavel:r.responsavel||'',captador:r.captador||'',editor:r.editor||'',
+      revisor:r.revisor||'',dataGravacao:r.data_gravacao||null,roteiro:r.roteiro||'',legenda:r.legenda||'',arquivo:r.arquivo||'',
+      link:r.link_publicado||'',obs:r.obs||'',aprovacao:r.aprovacao||null,aprovacaoComentario:r.aprovacao_comentario||'',
+      eventos:Array.isArray(r.eventos)?r.eventos:[],etapaDesde:ms(r.etapa_desde),publicadoEm:ms(r.publicado_em),criadoEm:ms(r.criado_em)}),
+    para:p=>({id:p.id,cliente_id:p.clienteId,titulo:p.titulo,formato:p.formato||'feed',etapa:p.etapa||'pauta',
+      data_publicacao:vazioNulo(p.data),hora:vazioNulo(p.hora),prioridade:p.prioridade||'normal',responsavel:vazioNulo(p.responsavel),
+      captador:vazioNulo(p.captador),editor:vazioNulo(p.editor),revisor:vazioNulo(p.revisor),data_gravacao:vazioNulo(p.dataGravacao),
+      roteiro:vazioNulo(p.roteiro),legenda:vazioNulo(p.legenda),arquivo:vazioNulo(p.arquivo),link_publicado:vazioNulo(p.link),
+      obs:vazioNulo(p.obs),aprovacao:vazioNulo(p.aprovacao),aprovacao_comentario:vazioNulo(p.aprovacaoComentario),
+      eventos:p.eventos||[],etapa_desde:isoTs(p.etapaDesde||p.criadoEm||Date.now()),publicado_em:isoTs(p.publicadoEm),
+      criado_em:isoTs(p.criadoEm||Date.now())})},
+  materiais:{tabela:'materiais',
+    de:r=>({id:r.id,clienteId:r.cliente_id,descricao:r.descricao,prazo:r.prazo||null,pedidoEm:ms(r.pedido_em),
+      recebidoEm:ms(r.recebido_em),ultimoLembrete:ms(r.ultimo_lembrete),lembretes:r.lembretes||0}),
+    para:m=>({id:m.id,cliente_id:m.clienteId,descricao:m.descricao,prazo:vazioNulo(m.prazo),pedido_em:isoTs(m.pedidoEm||Date.now()),
+      recebido_em:isoTs(m.recebidoEm),ultimo_lembrete:isoTs(m.ultimoLembrete),lembretes:m.lembretes||0})},
 };
-const ORDEM_GRAVAR=['clientes','atividades','compromissos'];
+const ORDEM_GRAVAR=['clientes','atividades','compromissos','postagens','materiais'];
+const deAlerta=r=>({id:r.id,clienteId:r.cliente_id,tipo:r.tipo,gravidade:r.gravidade,campanha:r.campanha||'',texto:r.texto,
+  criadoEm:ms(r.criado_em),resolvidoEm:ms(r.resolvido_em),resolvidoPor:r.resolvido_por||''});
+/* ajustes que vão para o banco (uma linha só) */
+const AJ=()=>({equipe:dados.equipe,servicos:dados.servicos,etapas:dados.etapas,checklist:dados.checklist,config:dados.config});
 const deLog=r=>({id:r.id,ts:ms(r.ts),quem:r.quem||'',acao:r.acao,detalhe:r.detalhe||''});
 
 /* "foto" do que o banco tem, para saber o que mudou */
 let base=null,logPendente=[],sincronizando=false,deNovo=false;
 function fotografar(){
-  base={ajustes:JSON.stringify({equipe:dados.equipe,servicos:dados.servicos}),
+  base={ajustes:JSON.stringify(AJ()),
     pagamentos:new Map(Object.entries(dados.pagamentos||{}).map(([k,v])=>[k,String(v)]))};
   for(const k of ORDEM_GRAVAR)base[k]=new Map((dados[k]||[]).map(o=>[o.id,JSON.stringify(TABELAS[k].para(o))]));
 }
@@ -583,9 +746,15 @@ async function lerTudo(tabela,ordem){
 async function carregar(){
   if(!naNuvem)return localGet();
   try{
-    const [cli,ativ,comp,pg,aj]=await Promise.all([
+    const [cli,ativ,comp,pg,aj,posts,mats]=await Promise.all([
       lerTudo('clientes','id'),lerTudo('atividades','id'),lerTudo('compromissos','id'),
-      lerTudo('pagamentos'),sb.from('ajustes').select('*').eq('id','principal').maybeSingle()]);
+      lerTudo('pagamentos'),sb.from('ajustes').select('*').eq('id','principal').maybeSingle(),
+      lerTudo('postagens','id'),lerTudo('materiais','id')]);
+    let alertas=[];
+    if(pode('meta_ver')){
+      const {data}=await sb.from('alertas_anuncios').select('*').order('criado_em',{ascending:false}).limit(300);
+      alertas=(data||[]).map(deAlerta);
+    }
     let log=[];
     if(ehAdmin()){
       const {data}=await sb.from('historico').select('*').order('ts',{ascending:false}).limit(300);
@@ -596,7 +765,9 @@ async function carregar(){
     return {
       clientes:cli.map(TABELAS.clientes.de),atividades:ativ.map(TABELAS.atividades.de),
       compromissos:comp.map(TABELAS.compromissos.de),pagamentos,log,
-      equipe:aj.data?.equipe||['Você'],servicos:aj.data?.servicos||dados.servicos
+      postagens:posts.map(TABELAS.postagens.de),materiais:mats.map(TABELAS.materiais.de),alertas,
+      equipe:aj.data?.equipe||['Você'],servicos:aj.data?.servicos||dados.servicos,
+      etapas:aj.data?.etapas||dados.etapas,checklist:aj.data?.checklist||dados.checklist,config:aj.data?.config||dados.config
     };
   }catch(e){
     console.error(e);sinal('local','sem conexão — mostrando a última cópia');
@@ -651,10 +822,10 @@ async function sincronizar(){
       const {error}=await sb.from('pagamentos').delete().eq('cliente_id',cliente_id).eq('mes',mes);
       if(error)erros.push(error);else base.pagamentos.delete(k);
     }
-    /* 4. ajustes (equipe e serviços) */
-    const aj=JSON.stringify({equipe:dados.equipe,servicos:dados.servicos});
+    /* 4. ajustes (equipe, serviços, etapas, checklist, regras) */
+    const aj=JSON.stringify(AJ());
     if(aj!==base.ajustes){
-      const {error}=await sb.from('ajustes').update({equipe:dados.equipe,servicos:dados.servicos}).eq('id','principal');
+      const {error}=await sb.from('ajustes').update(AJ()).eq('id','principal');
       if(error)erros.push(error);else base.ajustes=aj;
     }
     /* 5. histórico */
@@ -711,19 +882,26 @@ function aplicarRemoto(k,p){
   }else if(k==='ajustes'){
     if(!p.new)return;
     dados.equipe=p.new.equipe||dados.equipe;dados.servicos=p.new.servicos||dados.servicos;
-    base.ajustes=JSON.stringify({equipe:dados.equipe,servicos:dados.servicos});
+    dados.etapas=p.new.etapas||dados.etapas;dados.checklist=p.new.checklist||dados.checklist;dados.config=p.new.config||dados.config;
+    base.ajustes=JSON.stringify(AJ());
+  }else if(k==='alertas_anuncios'){
+    const r=p.new;if(!r?.id||!pode('meta_ver'))return;
+    const a=deAlerta(r),i=dados.alertas.findIndex(x=>x.id===a.id);
+    if(i>=0)dados.alertas[i]=a;else dados.alertas.unshift(a);
   }
   redesenharLogo();
 }
 function ouvirNuvem(){
   if(!naNuvem||canal)return;
   canal=sb.channel('cometa-v2');
-  for(const t of ['clientes','atividades','compromissos','pagamentos','historico','ajustes'])
+  for(const t of ['clientes','atividades','compromissos','pagamentos','historico','ajustes','postagens','materiais','alertas_anuncios'])
     canal.on('postgres_changes',{event:'*',schema:'public',table:t},p=>aplicarRemoto(t,p));
   canal.subscribe();
 }
 
-let dados={clientes:[],atividades:[],compromissos:[],pagamentos:{},log:[],equipe:['Você'],servicos:['Captação','Tráfego pago','Edição de vídeo','Postagem','Stories','Reunião','Relatório','Criativo']};
+let dados={clientes:[],atividades:[],compromissos:[],pagamentos:{},log:[],postagens:[],materiais:[],alertas:[],
+  equipe:['Você'],servicos:['Captação','Tráfego pago','Edição de vídeo','Postagem','Stories','Reunião','Relatório','Criativo'],
+  etapas:null,checklist:null,config:null};
 let telaAtual='geral',clienteAberto=null,filtro='todos',fila=[],timerAviso=null;
 
 /* ============ PERFIL E PERMISSÕES ============ */
@@ -742,7 +920,10 @@ const PERMISSOES=[
   ['ajustes','Acessar ajustes e backup'],
   ['meta_ver','Ver anúncios da Meta dos clientes'],
   ['meta_editar','Pausar, ativar e mudar orçamento de campanhas'],
-  ['cometinha','Usar o Cometinha (assistente, no CRM e no WhatsApp)']
+  ['cometinha','Usar o Cometinha (assistente, no CRM e no WhatsApp)'],
+  ['postagens_editar','Criar e editar postagens e vídeos (calendário)'],
+  ['postagens_mover','Avançar etapas das postagens (gravou, editou, publicou…)'],
+  ['materiais','Pedir e marcar materiais dos clientes']
 ];
 let perfil={nome:'Você',papel:'admin',permissoes:{},ativo:true};
 const ehAdmin=()=>perfil.papel==='admin';
@@ -794,12 +975,15 @@ function fecharModal(){document.getElementById('fundo').classList.remove('ver')}
 document.getElementById('fundo').onclick=e=>{if(e.target.id==='fundo')fecharModal()};
 
 /* ============ NAVEGAÇÃO ============ */
-const TELAS=[['geral','Visão geral'],['minhas','Minhas'],['clientes','Clientes'],['externa','Externa'],['agenda','Agenda'],['lancar','Lançar'],['financeiro','Financeiro'],['equipe','Equipe'],['historico','Histórico'],['ajustes','Ajustes']];
+const TELAS=[['geral','Central'],['minhas','Minhas'],['calendario','Calendário'],['producao','Produção'],['clientes','Clientes'],['trafego','Tráfego'],['externa','Externa'],['agenda','Agenda'],['lancar','Lançar'],['financeiro','Financeiro'],['relatorios','Relatórios'],['equipe','Equipe'],['historico','Histórico'],['ajustes','Ajustes']];
 function telasVisiveis(){
   return TELAS.filter(([k])=>{
     if(k==='geral')return pode('ver_geral');
     if(k==='minhas')return true;
     if(k==='clientes')return pode('ver_clientes');
+    if(k==='calendario'||k==='producao')return true;
+    if(k==='trafego')return pode('meta_ver');
+    if(k==='relatorios')return pode('ver_clientes');
     if(k==='externa')return pode('ver_compromissos')||pode('criar_compromisso');
     if(k==='agenda')return pode('ver_agenda');
     if(k==='lancar')return pode('lancar');
@@ -815,15 +999,20 @@ function montarNav(){
   const atrasoTotal=ab.filter(a=>a.data&&diasAte(a.data)<0).length+compAbertos().filter(c=>c.data&&diasAte(c.data)<0).length;
   const atrasoMeu=ab.filter(a=>a.data&&diasAte(a.data)<0&&a.responsavel===perfil.nome).length
     +compAbertos().filter(c=>c.data&&diasAte(c.data)<0&&c.responsavel===perfil.nome).length;
+  const postAtr=postsAbertos().filter(p=>sitPost(p)==='atrasada');
+  const meusPosts=postsAbertos().filter(p=>donoPost(p)===perfil.nome);
+  const minhasEtAtr=meusPosts.filter(p=>{const pr=prazosPost(p).prazos[p.etapa];return pr&&pr<hojeISO()}).length;
   const pip=k=>{
-    if(k==='geral')return atrasoTotal?`<span class="pip alerta">${atrasoTotal}</span>`:(n?`<span class="pip">${n}</span>`:'');
-    if(k==='minhas')return atrasoMeu?`<span class="pip alerta">${atrasoMeu}</span>`:'';
+    if(k==='geral')return atrasoTotal+postAtr.length?`<span class="pip alerta">${atrasoTotal+postAtr.length}</span>`:(n?`<span class="pip">${n}</span>`:'');
+    if(k==='minhas')return atrasoMeu+minhasEtAtr?`<span class="pip alerta">${atrasoMeu+minhasEtAtr}</span>`:(meusPosts.length?`<span class="pip">${meusPosts.length}</span>`:'');
+    if(k==='calendario')return postAtr.length?`<span class="pip alerta">${postAtr.length}</span>`:'';
+    if(k==='trafego'){const a=alertasAbertos().length;return a?`<span class="pip alerta">${a}</span>`:''}
     return '';
   };
   document.getElementById('nav').innerHTML=visiveis.map(([k,r])=>
     `<button data-t="${k}" aria-current="${k===telaAtual}">${r}${pip(k)}</button>`).join('');
   document.getElementById('barra').innerHTML=visiveis.map(([k,r])=>
-    `<button data-t="${k}" aria-current="${k===telaAtual||(telaAtual==='ficha'&&k==='clientes')}">${r==='Visão geral'?'Geral':r}${pip(k)}</button>`).join('');
+    `<button data-t="${k}" aria-current="${k===telaAtual||(telaAtual==='ficha'&&k==='clientes')}">${r}${pip(k)}</button>`).join('');
   document.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>ir(b.dataset.t));
   document.getElementById('rodape').textContent=perfil.nome+' · '+(ehAdmin()?'administrador':'operador');
 }
@@ -841,6 +1030,10 @@ function ir(t){
   if(t==='financeiro')pintarFinanceiro();
   if(t==='historico')pintarHistorico();
   if(t==='ajustes')montarAjustes();
+  if(t==='calendario')pintarCalendario();
+  if(t==='producao')pintarProducao();
+  if(t==='trafego')pintarTrafego();
+  if(t==='relatorios')pintarRelatorios();
   montarNav();window.scrollTo(0,0);
 }
 
@@ -945,43 +1138,65 @@ function redesenhar(){
   montarNav();
 }
 
-/* ============ VISÃO GERAL ============ */
+/* ============ CENTRAL DE COMANDO ============ */
 function pintarGeral(){
-  const ab=todasAbertas();
+  const ab=todasAbertas(),hoje=hojeISO(),amanha=somaDias(hoje,1);
   const atras=ab.filter(a=>a.data&&diasAte(a.data)<0).sort((x,y)=>x.data<y.data?-1:1);
-  const hoje=ab.filter(a=>a.data&&diasAte(a.data)===0);
-  const amanha=ab.filter(a=>a.data&&diasAte(a.data)===1);
+  const deHoje=ab.filter(a=>a.data&&diasAte(a.data)===0);
+  const deAmanha=ab.filter(a=>a.data&&diasAte(a.data)===1);
   const rec=dados.atividades.filter(a=>a.feitaEm&&Date.now()-a.feitaEm<7*864e5).sort((x,y)=>y.feitaEm-x.feitaEm);
+  const pa=postsAbertos();
+  const pAtr=pa.filter(p=>sitPost(p)==='atrasada').sort((a,b)=>a.data.localeCompare(b.data));
+  const pHoje=pa.filter(p=>p.data===hoje&&sitPost(p)!=='atrasada').sort((a,b)=>String(a.hora||'99').localeCompare(String(b.hora||'99')));
+  const pRisco=pa.filter(p=>sitPost(p)==='risco');
+  const pAprov=pa.filter(p=>p.etapa==='aprovacao').sort(porPrioridade);
+  const vEd=pa.filter(p=>ehVideo(p.formato)&&['captacao','edicao'].includes(p.etapa));
+  const prazos=pa.filter(p=>{const pr=prazosPost(p).prazos[p.etapa];return pr&&pr>=hoje&&pr<=amanha&&sitPost(p)!=='atrasada'}).sort(porPrioridade);
   const ativos=dados.clientes.filter(c=>c.status!=='pausado');
-  const mrr=ativos.reduce((s,c)=>s+(Number(c.mensalidade)||0),0);
+  const verm=ativos.filter(c=>corCliente(c.id)==='vermelho').length;
+  const matAtr=[...new Set(materiaisPend().filter(m=>m.prazo&&m.prazo<hoje).map(m=>m.clienteId))];
+  const alertas=pode('meta_ver')?alertasAbertos():[];
   const d=new Date();
   document.getElementById('sub-geral').textContent=
-    d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,m=>m.toUpperCase());
-
-  document.getElementById('kpis').innerHTML=`
-    <div class="kpi"><div class="rot">Em aberto</div><div class="num">${ab.length}</div><div class="pe">${ativos.length} clientes ativos</div></div>
-    <div class="kpi ${atras.length?'alerta':''}"><div class="rot">Atrasado</div><div class="num">${atras.length}</div><div class="pe">${atras.length?'precisa de atenção':'nada atrasado'}</div></div>
-    <div class="kpi verde"><div class="rot">Entregue · 7 dias</div><div class="num">${rec.length}</div><div class="pe">últimos sete dias</div></div>
-    <div class="kpi"><div class="rot">Receita mensal</div><div class="num">${mrr?'R$ '+mrr.toLocaleString('pt-BR'):'—'}</div><div class="pe">soma dos contratos ativos</div></div>`;
+    d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'}).replace(/^./,m=>m.toUpperCase())+' · '+ativos.length+' clientes ativos';
+  const k=(rot,num,pe,cls)=>`<div class="kpi ${cls||''}"><div class="rot">${rot}</div><div class="num">${num}</div><div class="pe">${pe}</div></div>`;
+  document.getElementById('kpis').innerHTML=
+    k('Postagens atrasadas',pAtr.length,pAtr.length?'passou da data e não saiu':'nada atrasado',pAtr.length?'alerta':'')+
+    k('Publicar hoje',pHoje.length,pHoje.filter(p=>idxEt(p.etapa)<idxEt('agendamento')).length+' ainda não agendada(s)')+
+    k('Em risco',pRisco.length,'próximos '+cfg().risco_dias+' dias',pRisco.length?'alerta':'')+
+    k('Aprovações pendentes',pAprov.length,'esperando o cliente');
+  document.getElementById('kpis2').innerHTML=
+    k('Vídeos na fila',vEd.length,vEd.filter(p=>p.etapa==='edicao').length+' na edição')+
+    (pode('meta_ver')?k('Anúncios com problema',alertas.length,alertas.filter(a=>a.gravidade==='alta').length+' grave(s)',alertas.some(a=>a.gravidade==='alta')?'alerta':''):k('Entregue · 7 dias',rec.length,'atividades concluídas','verde'))+
+    k('Clientes atrasados',verm,matAtr.length?matAtr.length+' devendo material':'semáforo vermelho',verm?'alerta':'')+
+    k('Atividades atrasadas',atras.length,ab.length+' em aberto',atras.length?'alerta':'');
 
   const compHoje=compAbertos().filter(c=>c.data&&diasAte(c.data)<=1);
-  if(compHoje.length){
-    const q=document.getElementById('prazos-comp')||(()=>{
-      const d=document.createElement('div');d.id='prazos-comp';
-      document.getElementById('kpis').after(d);return d;})();
-    q.innerHTML=`<div class="rotulo">Agenda externa · hoje e amanhã</div>
-      <div class="painel">${compHoje.map(cartaoComp).join('')}</div>`;
-    ligarComp(q);
-  }else{const q=document.getElementById('prazos-comp');if(q)q.innerHTML=''}
+  let q=document.getElementById('prazos-comp');
+  if(!q){q=document.createElement('div');q.id='prazos-comp';document.getElementById('kpis2').after(q)}
+  q.innerHTML=compHoje.length?`<div class="rotulo">Agenda externa · hoje e amanhã</div><div class="painel">${compHoje.map(cartaoComp).join('')}</div>`:'';
+  ligarComp(q);
+
+  pintarSemaforo('semaforo');
+  blocoPosts(pAtr,'bl-post-atraso','<b>Nenhuma postagem atrasada</b>Tudo que tinha data já saiu.');
+  blocoPosts(pHoje,'bl-post-hoje','<b>Nada para publicar hoje</b>');
+  blocoPosts(pAprov,'bl-post-aprov','<b>Nada esperando o cliente</b>');
+  blocoPosts(prazos,'bl-prazos','<b>Nenhum prazo de etapa vencendo</b>');
+  const bm=document.getElementById('bl-materiais');
+  const lm=listaMateriais(null,true);
+  bm.innerHTML=lm?`<div class="painel">${lm}</div>`:'<div class="nada"><b>Ninguém devendo material</b></div>';
+  ligarMateriais(bm);
+  pintarCarga('bl-carga');
   bloco(atras,'bl-atraso','<b>Nada atrasado</b>Está tudo dentro do prazo.');
-  bloco(hoje,'bl-hoje','<b>Sem entrega marcada para hoje</b>Aproveite para adiantar o que está sem data.');
-  bloco(amanha,'bl-amanha','<b>Amanhã está livre</b>Nenhuma atividade marcada.');
+  bloco(deHoje,'bl-hoje','<b>Sem atividade marcada para hoje</b>Aproveite para adiantar o que está sem data.');
+  bloco(deAmanha,'bl-amanha','<b>Amanhã está livre</b>Nenhuma atividade marcada.');
   const el=document.getElementById('bl-recentes');
   el.innerHTML=rec.length?`<div class="painel">${rec.map(a=>`<div class="item"><div class="corpo">
       <div class="tit"><span class="dono">${esc(nomeCli(a.clienteId))}</span> · ${esc(a.titulo)}</div>
       <div class="sub"><span class="tag">${curta(a.feitaEm)}</span>${a.feitaPor?`<span>${esc(a.feitaPor)}</span>`:''}</div>
     </div></div>`).join('')}</div>`:`<div class="nada"><b>Nada entregue ainda</b>O que você marcar como OK aparece aqui.</div>`;
 }
+document.getElementById('b-emergencia').onclick=emergencia;
 
 /* ============ CLIENTES ============ */
 function anel(feitas,total){
@@ -996,8 +1211,9 @@ function pintarClientes(){
   const q=document.getElementById('busca').value.trim().toLowerCase();
   let lista=ordenados().filter(c=>c.nome.toLowerCase().includes(q));
   lista=lista.filter(c=>{
-    const p=abertas(c.id),atr=p.some(a=>a.data&&diasAte(a.data)<0);
-    if(filtro==='atraso')return atr;
+    const p=abertas(c.id),cor=corCliente(c.id);
+    if(filtro==='atraso')return cor==='vermelho';
+    if(filtro==='atencao')return cor==='amarelo';
     if(filtro==='pend')return p.length>0;
     if(filtro==='livre')return p.length===0&&c.status!=='pausado';
     if(filtro==='pausado')return c.status==='pausado';
@@ -1015,7 +1231,7 @@ function pintarClientes(){
     }).join('');
     return `<button class="cli" data-c="${c.id}">
       <div class="cli-topo">${anel(feitasMes,feitasMes+p.length)}
-        <div><h3>${esc(c.nome)}</h3><div class="meta">
+        <div><h3>${luz(corCliente(c.id))} ${esc(c.nome)}</h3><div class="meta">
           ${p.length?p.length+' em aberto':'tudo em dia'}${c.mensalidade?' · R$ '+Number(c.mensalidade).toLocaleString('pt-BR')+(c.diaVenc?' · dia '+c.diaVenc:''):''}
           ${c.status==='pausado'?' <span class="tag pausado">pausado</span>':''}
         </div></div></div>
@@ -1044,7 +1260,7 @@ function abrirFicha(cid){
     `${f.length} entregue${f.length===1?'':'s'}`,
     c.mensalidade?`R$ ${Number(c.mensalidade).toLocaleString('pt-BR')}/mês`:null,
     c.contato?esc(c.contato):null,
-    c.status==='pausado'?'<span class="tag pausado">pausado</span>':null
+    c.status==='pausado'?'<span class="tag pausado">pausado</span>':luz(corCliente(cid))+' '+NOME_COR[corCliente(cid)]
   ].filter(Boolean).join(' · ');
 
   bloco(p,'f-pend','<b>Zerado</b>Nenhuma atividade em aberto para este cliente.',false);
@@ -1066,7 +1282,9 @@ function abrirFicha(cid){
     registrar('Reabriu atividade',nomeCli(at.clienteId)+' — '+at.titulo);
     await gravar(dados);abrirFicha(cid);aviso('Atividade reaberta');
   });
+  pintarFichaProducao(cid);
   pintarMeta(cid);
+  esconder('b-add-post',pode('postagens_editar'));
   montarNav();
   if(fichaAnterior!==cid)window.scrollTo(0,0);
   fichaAnterior=cid;
@@ -1114,6 +1332,13 @@ async function demoFuncao(nome,b){
       {id:'3',texto:'Novidade chegando…',data:new Date(Date.now()-5*864e5).toISOString(),curtidas:201,comentarios:31,link:'#'}]};
     if(b.acao==='alterar')return {id:b.objetoId,nomeAntes:'exemplo',antes:{},depois:{}};
     if(b.acao==='info_chave')return {propria:false};
+    if(b.acao==='monitorar'){
+      const c=dados.clientes.find(x=>x.metaContaId);let novos=0;
+      if(c&&!dados.alertas.some(a=>a.tipo==='cpl_alto'&&!a.resolvidoEm)){
+        dados.alertas.unshift({id:uid(),clienteId:c.id,tipo:'cpl_alto',gravidade:'media',campanha:'',texto:'Exemplo: custo por conversa em 7 dias está R$ 9,80 (meta: até R$ 7,00).',criadoEm:Date.now(),resolvidoEm:null});novos=1}
+      return {verificados:dados.clientes.filter(x=>x.metaContaId).length,novos,erros:[]};
+    }
+    if(b.acao==='rotina')return {enviados:0,marcados:0,motivo:'No modo demonstração nada é enviado.'};
     throw new Error('No modo demonstração isso não está disponível.');
   }
   throw new Error('Função indisponível no modo demonstração.');
@@ -1306,6 +1531,8 @@ async function formChaveMeta(cid){
   if(ap)ap.onclick=async()=>{try{await chamarFuncao('meta',{acao:'apagar_chave',clienteId:cid});fecharModal();aviso('Voltou para a chave da Cometa')}catch(e){aviso(e.message)}};
 }
 document.getElementById('b-voltar').onclick=()=>ir('clientes');
+document.getElementById('b-add-post').onclick=()=>formPostagem(null,{clienteId:clienteAberto});
+document.getElementById('b-aprov').onclick=()=>linkAprovacao(clienteAberto);
 document.getElementById('b-add-cli').onclick=()=>{ir('lancar');document.getElementById('sel-cli').value=clienteAberto};
 
 /* --- WhatsApp: status do cliente --- */
@@ -1315,6 +1542,8 @@ document.getElementById('b-zap').onclick=()=>{
   const txt=`*${c.nome}* — status ${new Date().toLocaleDateString('pt-BR')}\n\n`+
     `✅ Entregue este mês (${f.length})\n`+(f.length?f.map(a=>`• ${a.titulo} — ${curta(a.feitaEm)}`).join('\n'):'• nada ainda')+
     `\n\n🔵 Em andamento (${p.length})\n`+(p.length?p.map(a=>`• ${a.titulo}${a.data?' — '+selo(a.data).txt:''}`).join('\n'):'• nada em aberto')+
+    (()=>{const ps=postsAbertos().filter(x=>x.clienteId===clienteAberto&&x.data).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,8);
+      return ps.length?`\n\n📅 Próximas postagens\n`+ps.map(x=>`• ${x.data.split('-').reverse().slice(0,2).join('/')} — ${x.titulo} (${etapaDe(x).nome.toLowerCase()})`).join('\n'):''})()+
     `\n\n— Cometa Digital`;
   const zap=(c.contato||'').replace(/\D/g,'');
   abrirModal(`<h3>Status para enviar</h3>
@@ -1340,46 +1569,13 @@ function carregarJsPDF(){
     s.onload=res;s.onerror=rej;document.head.appendChild(s);
   });
 }
-document.getElementById('b-relat').onclick=()=>{
-  const c=cliDe(clienteAberto);
-  const f=fechadas(clienteAberto).filter(a=>isoDe(new Date(a.feitaEm)).slice(0,7)===mesAtual());
-  const porTipo={};f.forEach(a=>porTipo[a.titulo]=(porTipo[a.titulo]||0)+1);
-  const mes=new Date().toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
-  abrirModal(`<h3>${esc(c.nome)} — ${mes}</h3>
-    <div class="kpi" style="margin-bottom:12px"><div class="rot">Entregas no mês</div><div class="num">${f.length}</div></div>
-    ${Object.keys(porTipo).length?`<div class="painel">${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,n])=>
-      `<div class="item"><div class="corpo"><div class="tit">${esc(t)}</div></div><span class="tag">${n}x</span></div>`).join('')}</div>`
-      :`<div class="nada">Nenhuma entrega registrada neste mês.</div>`}
-    <button class="btn sec" style="margin-top:12px" id="b-relat-pdf">Baixar PDF</button>
-    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
-  document.getElementById('b-relat-pdf').onclick=async()=>{
-    const bt=document.getElementById('b-relat-pdf');bt.disabled=true;bt.textContent='Gerando…';
-    try{await carregarJsPDF()}catch(e){bt.disabled=false;bt.textContent='Baixar PDF';return aviso('Sem internet para gerar o PDF')}
-    const {jsPDF}=window.jspdf;
-    const doc=new jsPDF();
-    doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(75,59,228);
-    doc.text('Cometa Digital',14,20);
-    doc.setFontSize(13);doc.setFont('helvetica','normal');doc.setTextColor(22,27,61);
-    doc.text(c.nome+' — '+mes,14,30);
-    doc.setDrawColor(225,228,240);doc.line(14,35,196,35);
-    doc.setFontSize(11);
-    doc.text('Entregas no mês: '+f.length,14,46);
-    let y=57;
-    const linhas=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
-    if(linhas.length){
-      linhas.forEach(([t,n])=>{doc.text('• '+t+' — '+n+'x',14,y);y+=8});
-    }else{doc.text('Nenhuma entrega registrada neste mês.',14,y);y+=8}
-    doc.setFontSize(9);doc.setTextColor(120,126,150);
-    doc.text('Gerado em '+new Date().toLocaleDateString('pt-BR')+' pelo Cometa OS',14,286);
-    doc.save('relatorio-'+c.nome.replace(/\s+/g,'-').toLowerCase()+'-'+mesAtual()+'.pdf');
-    bt.disabled=false;bt.textContent='Baixar PDF';
-  };
-};
+document.getElementById('b-relat').onclick=()=>abrirRelatorio(clienteAberto,mesAtual());
 
 /* --- cadastro/edição de cliente --- */
 function formCliente(c){
-  c=c||{};
-  abrirModal(`<h3>${c.id?'Editar cliente':'Novo cliente'}</h3>
+  c=c||{};const novo=!c.id;
+  const sv=c.servicosCli||[];
+  abrirModal(`<h3>${novo?'Novo cliente':'Editar cliente'}</h3>
     <div class="campo"><label>Nome</label><input id="c-nome" value="${esc(c.nome||'')}"></div>
     <div class="campo"><label>WhatsApp</label><input id="c-contato" placeholder="35 9 9999-9999" value="${esc(c.contato||'')}"></div>
     <div class="dupla">
@@ -1390,27 +1586,54 @@ function formCliente(c){
       <div class="campo"><label>Situação</label><select id="c-status">
         <option value="ativo" ${c.status!=='pausado'?'selected':''}>Ativo</option>
         <option value="pausado" ${c.status==='pausado'?'selected':''}>Pausado</option></select></div>
+      <div class="campo"><label>Postagens por mês</label><input id="c-posts" type="number" min="0" value="${esc(c.postsMes||'')}"></div>
     </div>
-    <button class="btn" id="c-salvar">Salvar</button>
+    <div class="campo"><label>Serviços contratados</label><div class="chips-servico">${[...new Set([...SERVICOS_CONTRATO,...sv])].map(x=>
+      `<label><input type="checkbox" data-sv="${esc(x)}" ${sv.includes(x)?'checked':''}> ${esc(x)}</label>`).join('')}</div></div>
+    <div class="dupla">
+      <div class="campo"><label>Contrato desde</label><input id="c-ini" type="date" value="${esc(c.contratoInicio||'')}"></div>
+      <div class="campo"><label>Contrato até</label><input id="c-fim" type="date" value="${esc(c.contratoFim||'')}"></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Responsável social</label><select id="c-rsoc">${opcoesEquipe(c.respSocial)}</select></div>
+      <div class="campo"><label>Responsável tráfego</label><select id="c-rtra">${opcoesEquipe(c.respTrafego)}</select></div>
+    </div>
+    <div class="campo"><label>Briefing (tom de voz, público, o que pode e não pode)</label><textarea id="c-brief" style="min-height:90px">${esc(c.briefing||'')}</textarea></div>
+    <div class="campo"><label>Links e acessos (Drive, site, onde ficam as senhas… evite colar senhas aqui)</label><textarea id="c-acessos">${esc(c.acessos||'')}</textarea></div>
+    ${novo?`<label class="chk"><input type="checkbox" id="c-check" checked> Criar o checklist de entrada (${(dados.checklist||CHECKLIST_PADRAO).length} tarefas)</label>`:''}
+    <button class="btn" id="c-salvar" style="margin-top:8px">Salvar</button>
     ${c.id?`<button class="btn sec" style="margin-top:8px" id="c-excluir">Excluir cliente</button>`:''}
     <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
-  document.getElementById('c-salvar').onclick=async()=>{
-    const nome=document.getElementById('c-nome').value.trim();
+  const $=id=>document.getElementById(id);
+  $('c-salvar').onclick=async()=>{
+    const nome=$('c-nome').value.trim();
     if(!nome)return aviso('Escreva o nome do cliente');
-    const dadosCli={nome,contato:document.getElementById('c-contato').value.trim(),
-      mensalidade:document.getElementById('c-mens').value,diaVenc:document.getElementById('c-venc').value,
-      status:document.getElementById('c-status').value};
+    const dadosCli={nome,contato:$('c-contato').value.trim(),mensalidade:$('c-mens').value,diaVenc:$('c-venc').value,
+      status:$('c-status').value,postsMes:$('c-posts').value,
+      servicosCli:[...document.querySelectorAll('[data-sv]')].filter(x=>x.checked).map(x=>x.dataset.sv),
+      contratoInicio:$('c-ini').value||null,contratoFim:$('c-fim').value||null,respSocial:$('c-rsoc').value,respTrafego:$('c-rtra').value,
+      briefing:$('c-brief').value.trim(),acessos:$('c-acessos').value.trim()};
+    let n=0;
     if(c.id)Object.assign(dados.clientes.find(x=>x.id===c.id),dadosCli);
-    else dados.clientes.push({id:uid(),criadoEm:Date.now(),...dadosCli});
-    registrar(c.id?'Editou cliente':'Cadastrou cliente',nome);
+    else{
+      const id=uid();
+      dados.clientes.push({id,criadoEm:Date.now(),token:tokenNovo(),...dadosCli});
+      /* checklist de entrada: vira atividade para o cliente novo */
+      if($('c-check')?.checked&&pode('lancar'))(dados.checklist||CHECKLIST_PADRAO).forEach(t=>{
+        dados.atividades.push({id:uid(),clienteId:id,titulo:t.titulo,obs:'Checklist de entrada',prioridade:'normal',
+          responsavel:dadosCli.respSocial||'',recorrencia:null,data:somaDias(hojeISO(),Number(t.dias)||0),criadoEm:Date.now(),feitaEm:null});n++});
+    }
+    registrar(c.id?'Editou cliente':'Cadastrou cliente',nome+(n?` (+${n} tarefas de entrada)`:''));
     await gravar(dados);fecharModal();
     clienteAberto&&c.id?abrirFicha(c.id):ir('clientes');
-    aviso(c.id?'Cadastro atualizado':'Cliente cadastrado');
+    aviso(c.id?'Cadastro atualizado':'Cliente cadastrado'+(n?` com ${n} tarefas de entrada`:''));
   };
-  if(c.id)document.getElementById('c-excluir').onclick=async()=>{
-    if(!confirm('Excluir '+c.nome+' e todas as atividades?'))return;
+  if(c.id)$('c-excluir').onclick=async()=>{
+    if(!confirm('Excluir '+c.nome+' com todas as atividades, postagens e materiais?'))return;
     dados.clientes=dados.clientes.filter(x=>x.id!==c.id);
     dados.atividades=dados.atividades.filter(a=>a.clienteId!==c.id);
+    dados.postagens=dados.postagens.filter(a=>a.clienteId!==c.id);
+    dados.materiais=dados.materiais.filter(a=>a.clienteId!==c.id);
     registrar('Excluiu cliente',c.nome);
     await gravar(dados);fecharModal();ir('clientes');aviso('Cliente excluído');
   };
@@ -1795,7 +2018,7 @@ function pintarMinhas(){
 
   document.getElementById('minhas-tit').textContent='Olá, '+eu;
   document.getElementById('minhas-sub').textContent=
-    minhasAtiv.length+' atividade'+(minhasAtiv.length===1?'':'s')+' e '+meusComp.length+' compromisso'+(meusComp.length===1?'':'s')
+    minhasAtiv.length+' atividade'+(minhasAtiv.length===1?'':'s')+', '+postsAbertos().filter(p=>donoPost(p)===eu).length+' etapa(s) de postagem e '+meusComp.length+' compromisso'+(meusComp.length===1?'':'s')
     +(atrasadas?' · '+atrasadas+' em atraso':'');
 
   const c1=document.getElementById('minhas-comp');
@@ -1803,6 +2026,9 @@ function pintarMinhas(){
     :'<div class="nada" style="padding:20px">Nenhum compromisso marcado para você.</div>';
   ligarComp(c1);
 
+  const meusPosts=postsAbertos().filter(p=>donoPost(p)===eu).sort((a,b)=>{
+    const pa=prazosPost(a).prazos[a.etapa]||'9999',pb=prazosPost(b).prazos[b.etapa]||'9999';return pa.localeCompare(pb)||porPrioridade(a,b)});
+  blocoPosts(meusPosts,'minhas-posts','<b>Nenhuma etapa com você</b>Quando uma postagem chegar na sua etapa (gravar, editar, revisar…), ela aparece aqui.');
   bloco(minhasAtiv,'minhas-ativ','<b>Nada pendente</b>Nenhuma atividade atribuída a você.',true);
 
   document.getElementById('minhas-feitas').innerHTML=feitas.length
@@ -1820,7 +2046,11 @@ function montarAjustes(){
     ? 'Nuvem ligada: os dados aparecem igual no celular e no computador.'
     : 'Nuvem desligada: os dados ficam salvos apenas neste navegador.';
   document.getElementById('b-sair').style.display=naNuvem?'block':'none';
+  montarAjustesProducao();
 }
+document.getElementById('aj-nova-etapa').onclick=novaEtapa;
+document.getElementById('aj-salvar-prod').onclick=salvarAjustesProducao;
+document.querySelectorAll('[data-rotina]').forEach(b=>b.onclick=()=>rodarRotina(b.dataset.rotina,b));
 document.getElementById('b-sair').onclick=()=>{if(confirm('Sair da conta neste aparelho?'))sair()};
 document.getElementById('b-salvar-aj').onclick=async()=>{
   const lst=id=>document.getElementById(id).value.split(',').map(s=>s.trim()).filter(Boolean);
@@ -1839,11 +2069,743 @@ document.getElementById('arquivo').onchange=e=>{
   r.onload=async()=>{try{
     const d=JSON.parse(r.result);
     if(!d.clientes)throw 0;
-    dados={equipe:['Você'],servicos:dados.servicos,...d};
+    dados={equipe:['Você'],servicos:dados.servicos,postagens:[],materiais:[],alertas:[],compromissos:[],pagamentos:{},log:[],
+      etapas:dados.etapas,checklist:dados.checklist,config:dados.config,...d};
     await gravar(dados);ir('geral');aviso('Backup restaurado');
   }catch(err){aviso('Arquivo inválido — use um backup gerado aqui')}};
   r.readAsText(f);
 };
+
+/* ============ PRODUÇÃO: ETAPAS, PRAZOS E SEMÁFORO ============
+   Mesmas regras do servidor (supabase/functions/_shared/producao.ts).
+   Cada postagem anda pelas etapas; o prazo de cada etapa conta para trás
+   a partir da data de publicação. */
+const ETAPAS_PADRAO=[
+  {k:'pauta',nome:'Pauta',dias:10,quem:'responsavel'},
+  {k:'producao',nome:'Produção solicitada',dias:8,quem:'responsavel'},
+  {k:'captacao',nome:'Captação',dias:6,quem:'captador'},
+  {k:'edicao',nome:'Edição',dias:4,quem:'editor'},
+  {k:'revisao',nome:'Revisão interna',dias:3,quem:'revisor'},
+  {k:'aprovacao',nome:'Aprovação do cliente',dias:2,quem:'cliente'},
+  {k:'agendamento',nome:'Agendamento',dias:1,quem:'responsavel'},
+  {k:'publicado',nome:'Publicado',dias:0,quem:'responsavel'}];
+const FORMATOS={feed:'Post (feed)',carrossel:'Carrossel',reels:'Reels',video:'Vídeo',stories:'Stories',arte:'Arte / anúncio'};
+const QUEM={responsavel:'Responsável',captador:'Quem grava',editor:'Quem edita',revisor:'Quem revisa',cliente:'Cliente'};
+const SERVICOS_CONTRATO=['Social media','Tráfego pago','Produção de vídeo','Fotografia','Identidade visual','Site'];
+const CHECKLIST_PADRAO=[
+  {titulo:'Coletar acessos (Instagram, Facebook, Gerenciador de Anúncios)',dias:0},
+  {titulo:'Reunião de briefing',dias:2},
+  {titulo:'Receber identidade visual (logo, cores, fontes)',dias:3},
+  {titulo:'Planejamento do primeiro mês',dias:5},
+  {titulo:'Montar calendário de postagens',dias:6},
+  {titulo:'Configurar campanhas de anúncio',dias:7}];
+const CONFIG_PADRAO={capacidade:15,risco_dias:3,editores:[],bom_dia_whatsapp:true,alerta_whatsapp:true,lembrete_materiais_auto:false};
+const ehVideo=f=>f==='reels'||f==='video';
+const cfg=()=>({...CONFIG_PADRAO,...(dados.config||{})});
+const tokenNovo=()=>novoUUID().replace(/-/g,'');
+
+function etapas(){
+  const l=(Array.isArray(dados.etapas)?dados.etapas:[]).filter(x=>x&&x.k);
+  if(!l.length)return ETAPAS_PADRAO;
+  return [...l.filter(x=>x.k!=='publicado').map(x=>({k:x.k,nome:String(x.nome||x.k),dias:Math.max(0,Number(x.dias)||0),quem:x.quem||'responsavel'})),
+    {k:'publicado',nome:'Publicado',dias:0,quem:'responsavel'}];
+}
+const idxEt=k=>{const i=etapas().findIndex(e=>e.k===k);return i<0?0:i};
+const etapaDe=p=>etapas()[idxEt(p.etapa)];
+const postsAbertos=()=>(dados.postagens||[]).filter(p=>p.etapa!=='publicado'&&cliDe(p.clienteId).status!=='pausado');
+function donoPost(p){
+  const e=etapaDe(p);
+  if(!e||e.k==='publicado')return null;
+  if(e.quem==='cliente')return 'cliente';
+  return p[e.quem]||p.responsavel||null;
+}
+function prazosPost(p){
+  const E=etapas(),r={};
+  if(!p.data)return{prazos:r,reorg:false};
+  const pub=p.data,hoje=hojeISO(),at=idxEt(p.etapa);
+  E.forEach(e=>r[e.k]=somaDias(pub,-e.dias));
+  let reorg=false;const cur=E[at];
+  /* etapa atrasada: o que falta é comprimido entre hoje e a publicação */
+  if(cur&&cur.k!=='publicado'&&r[cur.k]<hoje&&pub>=hoje){
+    const disp=diasAte(pub),base=cur.dias||1;
+    for(let i=at;i<E.length;i++)r[E[i].k]=somaDias(pub,-Math.floor(E[i].dias*disp/base));
+    reorg=true;
+  }
+  return{prazos:r,reorg};
+}
+const horaAgora=()=>new Date().toTimeString().slice(0,5);
+function sitPost(p){
+  if(p.etapa==='publicado')return 'publicada';
+  if(!p.data)return 'sem_data';
+  const hoje=hojeISO();
+  if(p.data<hoje)return 'atrasada';
+  if(p.data===hoje&&p.hora&&horaAgora()>p.hora)return 'atrasada';
+  const E=etapas(),iAg=E.findIndex(e=>e.k==='agendamento');
+  const pronta=iAg>=0?idxEt(p.etapa)>=iAg:false;
+  if(!pronta&&diasAte(p.data)<=cfg().risco_dias)return 'risco';
+  const e=etapaDe(p);
+  if(e&&somaDias(p.data,-e.dias)<hoje)return 'risco';
+  return 'ok';
+}
+/* semáforo: vermelho = postagem que passou da data e não saiu (ou tarefa atrasada); amarelo = alguma em risco */
+function corCliente(cid){
+  if(todasAbertas().some(a=>a.clienteId===cid&&a.data&&diasAte(a.data)<0))return 'vermelho';
+  let cor='verde';
+  for(const p of postsAbertos())if(p.clienteId===cid){
+    const s=sitPost(p);
+    if(s==='atrasada')return 'vermelho';
+    if(s==='risco')cor='amarelo';
+  }
+  return cor;
+}
+const NOME_COR={vermelho:'atrasado',amarelo:'atenção',verde:'em dia'};
+const luz=cor=>`<span class="luz ${cor}" title="${NOME_COR[cor]}"></span>`;
+const ordemSit={atrasada:0,risco:1,ok:2,sem_data:3,publicada:4};
+const porPrioridade=(a,b)=>(a.prioridade==='alta'?0:1)-(b.prioridade==='alta'?0:1)||String(a.data||'9999').localeCompare(String(b.data||'9999'));
+const materiaisPend=cid=>(dados.materiais||[]).filter(m=>!m.recebidoEm&&(!cid||m.clienteId===cid));
+const alertasAbertos=cid=>(dados.alertas||[]).filter(a=>!a.resolvidoEm&&(!cid||a.clienteId===cid));
+function dataPostTxt(p){
+  if(!p.data)return{txt:'sem data',cls:''};
+  const s=selo(p.data);
+  return{txt:(s.cls==='atraso'?'era '+p.data.split('-').reverse().slice(0,2).join('/'):s.txt)+(p.hora?' '+p.hora:''),cls:s.cls};
+}
+
+/* ---- cartão de postagem (lista) ---- */
+function cartaoPost(p,mostrarCliente){
+  const sit=sitPost(p),e=etapaDe(p),E=etapas(),i=idxEt(p.etapa),prox=E[i+1];
+  const d=dataPostTxt(p),dono=donoPost(p),pz=prazosPost(p),prazo=pz.prazos[p.etapa];
+  const sp=prazo&&p.etapa!=='publicado'?selo(prazo):null;
+  return `<div class="item post-item" data-post="${p.id}">
+    <span class="bola-sit sit-${sit}"></span>
+    <div class="corpo" data-abre-post="${p.id}">
+      <div class="tit">${mostrarCliente!==false?`<span class="dono">${esc(nomeCli(p.clienteId))}</span> · `:''}${esc(p.titulo)}</div>
+      <div class="sub">
+        <span class="tag">${esc(FORMATOS[p.formato]||p.formato)}</span>
+        <span class="tag ${p.etapa==='publicado'?'rec':sit==='atrasada'?'atraso':d.cls}">${p.etapa==='publicado'?'publicado'+(p.data?' '+p.data.split('-').reverse().slice(0,2).join('/'):''):'publica '+d.txt}</span>
+        <span class="tag etapa">${esc(e.nome)}</span>
+        ${dono?`<span>${dono==='cliente'?'esperando o cliente':'com '+esc(dono)}</span>`:''}
+        ${sp&&p.etapa!=='publicado'?`<span>prazo da etapa: ${sp.txt.toLowerCase()}</span>`:''}
+        ${pz.reorg?'<span class="tag amanha">prazos reorganizados</span>':''}
+        ${p.aprovacao==='ajustes'&&p.etapa!=='publicado'?'<span class="tag atraso">cliente pediu ajuste</span>':''}
+        ${p.prioridade==='alta'?'<span class="tag alta">prioridade</span>':''}
+      </div>
+    </div>
+    ${prox&&podeMover()?`<button class="ok" data-avanca="${p.id}" title="Avançar para ${esc(prox.nome)}">${esc(prox.k==='publicado'?'publicado ✓':prox.nome)} →</button>`:''}
+  </div>`;
+}
+const podeMover=()=>pode('postagens_mover')||pode('postagens_editar');
+function ligarPosts(raiz){
+  raiz.querySelectorAll('[data-abre-post],.kcard[data-post],.cal-p[data-post]').forEach(b=>b.onclick=e=>{
+    if(e.target.closest('[data-avanca]'))return;
+    formPostagem(dados.postagens.find(x=>x.id===(b.dataset.abrePost||b.dataset.post)));
+  });
+  raiz.querySelectorAll('[data-avanca]').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    const p=dados.postagens.find(x=>x.id===b.dataset.avanca);
+    const E=etapas();moverPost(p,E[idxEt(p.etapa)+1].k);
+  });
+}
+function blocoPosts(lista,alvo,vazio,mostrarCliente){
+  const el=document.getElementById(alvo);if(!el)return;
+  el.innerHTML=lista.length?`<div class="painel">${lista.map(p=>cartaoPost(p,mostrarCliente)).join('')}</div>`:`<div class="nada">${vazio}</div>`;
+  ligarPosts(el);
+}
+
+/* ---- mudar de etapa ---- */
+async function moverPost(p,destino,extra){
+  const E=etapas(),de=etapaDe(p),para=E.find(e=>e.k===destino);
+  if(!para||para.k===p.etapa)return;
+  if(!podeMover())return aviso('Sem permissão para mudar etapas');
+  const antes={etapa:p.etapa,aprovacao:p.aprovacao,link:p.link,publicadoEm:p.publicadoEm,etapaDesde:p.etapaDesde,eventos:[...(p.eventos||[])]};
+  if(para.k==='publicado'&&!(extra&&extra.link!==undefined)){
+    const l=prompt('Link da publicação (opcional). Deixe em branco se não tiver.',p.link||'');
+    if(l===null)return;
+    p.link=l.trim();
+  }else if(extra&&extra.link!==undefined)p.link=extra.link;
+  p.etapa=para.k;p.etapaDesde=Date.now();
+  if(para.k==='aprovacao')p.aprovacao='pendente';
+  p.publicadoEm=para.k==='publicado'?(p.publicadoEm||Date.now()):null;
+  p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:perfil.nome,txt:`${de.nome} → ${para.nome}`+(extra&&extra.comentario?': '+extra.comentario:'')}];
+  registrar('Moveu postagem',nomeCli(p.clienteId)+' — '+p.titulo+': '+para.nome);
+  await gravar(dados);redesenhar();
+  if(para.k==='aprovacao')aviso('Foi para aprovação do cliente',()=>linkAprovacao(p.clienteId));
+  else aviso(p.titulo+' → '+para.nome,async()=>{Object.assign(p,antes);await gravar(dados);redesenhar()});
+}
+
+/* ---- formulário da postagem ---- */
+const opcoesEquipe=sel=>'<option value="">—</option>'+dados.equipe.map(n=>`<option ${sel===n?'selected':''}>${esc(n)}</option>`).join('');
+function formPostagem(p,novoCom){
+  const novo=!p;
+  if(novo){
+    if(!pode('postagens_editar'))return aviso('Sem permissão para criar postagens');
+    const cid=(novoCom&&novoCom.clienteId)||clienteAberto||ordenados()[0]?.id;
+    p={id:uid(),clienteId:cid,titulo:'',formato:'feed',etapa:etapas()[0].k,data:(novoCom&&novoCom.data)||null,hora:'',prioridade:'normal',
+      responsavel:cliDe(cid).respSocial||'',captador:'',editor:'',revisor:'',dataGravacao:null,roteiro:'',legenda:'',arquivo:'',link:'',obs:'',
+      aprovacao:null,aprovacaoComentario:'',eventos:[],criadoEm:Date.now(),etapaDesde:Date.now()};
+  }
+  const ed=pode('postagens_editar'),mv=podeMover(),dis=ed?'':'disabled';
+  const E=etapas(),pz=prazosPost(p);
+  abrirModal(`<h3>${novo?'Nova postagem':'Postagem'}</h3>
+    <div class="campo"><label>Cliente</label><select id="po-cli" ${dis}>${ordenados().map(c=>`<option value="${c.id}" ${c.id===p.clienteId?'selected':''}>${esc(c.nome)}</option>`).join('')}</select></div>
+    <div class="campo"><label>Tema</label><input id="po-tit" value="${esc(p.titulo)}" placeholder="Ex.: Promoção de terça" ${dis}></div>
+    <div class="dupla">
+      <div class="campo"><label>Formato</label><select id="po-fmt" ${dis}>${Object.entries(FORMATOS).map(([k,n])=>`<option value="${k}" ${p.formato===k?'selected':''}>${n}</option>`).join('')}</select></div>
+      <div class="campo"><label>Etapa</label><select id="po-etapa" ${mv?'':'disabled'}>${E.map(e=>`<option value="${e.k}" ${p.etapa===e.k?'selected':''}>${esc(e.nome)}${pz.prazos[e.k]&&e.k!=='publicado'?' · até '+pz.prazos[e.k].split('-').reverse().slice(0,2).join('/'):''}</option>`).join('')}</select></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Publicar em</label><input type="date" id="po-data" value="${esc(p.data||'')}" ${dis}></div>
+      <div class="campo"><label>Horário</label><input type="time" id="po-hora" value="${esc(p.hora||'')}" ${dis}></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Responsável</label><select id="po-resp" ${dis}>${opcoesEquipe(p.responsavel)}</select></div>
+      <div class="campo"><label>Prioridade</label><select id="po-prio" ${dis}><option value="normal">Normal</option><option value="alta" ${p.prioridade==='alta'?'selected':''}>Alta</option></select></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Quem grava</label><select id="po-capt" ${dis}>${opcoesEquipe(p.captador)}</select></div>
+      <div class="campo"><label>Data da gravação</label><input type="date" id="po-grav" value="${esc(p.dataGravacao||'')}" ${dis}></div>
+    </div>
+    <div class="dupla">
+      <div class="campo"><label>Quem edita</label><select id="po-edit" ${dis}>${opcoesEquipe(p.editor)}</select></div>
+      <div class="campo"><label>Quem revisa</label><select id="po-rev" ${dis}>${opcoesEquipe(p.revisor)}</select></div>
+    </div>
+    <div class="campo"><label>Roteiro</label><textarea id="po-rot" ${dis}>${esc(p.roteiro||'')}</textarea></div>
+    <div class="campo"><label>Legenda</label><textarea id="po-leg" ${dis}>${esc(p.legenda||'')}</textarea></div>
+    <div class="campo"><label>Arquivo final (link do Drive, WeTransfer…)</label>
+      <div style="display:flex;gap:6px"><input id="po-arq" value="${esc(String(p.arquivo||'').startsWith('storage:')?'(arquivo enviado pelo CRM)':p.arquivo||'')}" placeholder="https://…" ${mv?'':'disabled'}>
+      ${p.arquivo?'<button class="mini" id="po-ver">abrir</button>':''}
+      ${naNuvem&&mv?'<button class="mini" id="po-up">enviar</button><input type="file" id="po-file" hidden>':''}</div></div>
+    ${p.etapa==='publicado'||p.link?`<div class="campo"><label>Link da publicação</label><input id="po-link" value="${esc(p.link||'')}" ${mv?'':'disabled'}></div>`:''}
+    <div class="campo"><label>Observação</label><textarea id="po-obs" ${dis}>${esc(p.obs||'')}</textarea></div>
+    ${p.aprovacaoComentario?`<div class="meta-alerta" style="margin-bottom:12px"><b>Cliente:</b> ${esc(p.aprovacaoComentario)}</div>`:''}
+    <button class="btn" id="po-salvar">${novo?'Criar postagem':'Salvar'}</button>
+    ${!novo&&ed?'<button class="btn sec" style="margin-top:8px" id="po-dup">Duplicar</button>':''}
+    ${!novo&&ed?'<button class="btn sec" style="margin-top:8px" id="po-excluir">Excluir</button>':''}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>
+    ${(p.eventos||[]).length?`<div class="eventos"><b>Histórico</b>${[...p.eventos].reverse().map(v=>`<div>${new Date(v.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${esc(v.quem)} · ${esc(v.txt)}</div>`).join('')}</div>`:''}`);
+  const $=id=>document.getElementById(id);
+  const arqOriginal=p.arquivo;
+  $('po-cli').onchange=e=>{if(!$('po-resp').value)$('po-resp').value=cliDe(e.target.value).respSocial||''};
+  if($('po-ver'))$('po-ver').onclick=()=>abrirArquivo(p.arquivo);
+  if($('po-up')){
+    $('po-up').onclick=()=>$('po-file').click();
+    $('po-file').onchange=async e=>{
+      const f=e.target.files[0];if(!f)return;
+      if(f.size>500*1024*1024)return aviso('Arquivo acima de 500 MB. Use um link do Drive.');
+      $('po-up').textContent='enviando…';$('po-up').disabled=true;
+      const caminho=`${$('po-cli').value}/${p.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g,'_')}`;
+      const {error}=await sb.storage.from('arquivos').upload(caminho,f,{upsert:false});
+      $('po-up').disabled=false;$('po-up').textContent='enviar';
+      if(error)return aviso('Não deu para enviar: '+error.message);
+      p.arquivo='storage:'+caminho;$('po-arq').value='(arquivo enviado pelo CRM)';aviso('Arquivo enviado. Clique em Salvar.');
+    };
+  }
+  $('po-salvar').onclick=async()=>{
+    const tit=$('po-tit').value.trim();
+    if(!tit)return aviso('Escreva o tema');
+    const etapaNova=$('po-etapa').value,etapaVelha=novo?null:p.etapa;
+    const arqTela=$('po-arq').value.trim();
+    const arquivo=arqTela==='(arquivo enviado pelo CRM)'?p.arquivo:arqTela;
+    if(ed)Object.assign(p,{clienteId:$('po-cli').value,titulo:tit,formato:$('po-fmt').value,data:$('po-data').value||null,
+      hora:$('po-hora').value||'',responsavel:$('po-resp').value,prioridade:$('po-prio').value,captador:$('po-capt').value,
+      dataGravacao:$('po-grav').value||null,editor:$('po-edit').value,revisor:$('po-rev').value,roteiro:$('po-rot').value.trim(),
+      legenda:$('po-leg').value.trim(),obs:$('po-obs').value.trim()});
+    p.arquivo=arquivo;
+    if($('po-link'))p.link=$('po-link').value.trim();
+    if(arquivo&&arquivo!==arqOriginal)p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:perfil.nome,txt:'Anexou o arquivo final'}];
+    if(novo){
+      p.eventos=[{ts:new Date().toISOString(),quem:perfil.nome,txt:'Criou a postagem'}];
+      p.etapa=etapaNova;dados.postagens.push(p);
+      registrar('Criou postagem',nomeCli(p.clienteId)+' — '+p.titulo);
+      await gravar(dados);fecharModal();redesenhar();aviso('Postagem criada');
+    }else if(etapaNova!==etapaVelha){
+      fecharModal();await moverPost(p,etapaNova);
+    }else{
+      registrar('Editou postagem',nomeCli(p.clienteId)+' — '+p.titulo);
+      await gravar(dados);fecharModal();redesenhar();aviso('Postagem salva');
+    }
+  };
+  if($('po-dup'))$('po-dup').onclick=async()=>{
+    const c={...p,id:uid(),etapa:etapas()[0].k,link:'',arquivo:'',aprovacao:null,aprovacaoComentario:'',publicadoEm:null,
+      eventos:[{ts:new Date().toISOString(),quem:perfil.nome,txt:'Duplicou de "'+p.titulo+'"'}],criadoEm:Date.now(),etapaDesde:Date.now(),
+      data:p.data?somaDias(p.data,7):null};
+    dados.postagens.push(c);registrar('Criou postagem',nomeCli(c.clienteId)+' — '+c.titulo+' (cópia)');
+    await gravar(dados);fecharModal();redesenhar();aviso('Cópia criada para uma semana depois');formPostagem(c);
+  };
+  if($('po-excluir'))$('po-excluir').onclick=async()=>{
+    if(!confirm('Excluir a postagem "'+p.titulo+'"?'))return;
+    dados.postagens=dados.postagens.filter(x=>x.id!==p.id);
+    registrar('Excluiu postagem',nomeCli(p.clienteId)+' — '+p.titulo);
+    await gravar(dados);fecharModal();redesenhar();
+    aviso('Postagem excluída',async()=>{dados.postagens.push(p);await gravar(dados);redesenhar()});
+  };
+}
+async function abrirArquivo(a){
+  if(!a)return;
+  if(/^https?:\/\//i.test(a))return window.open(a,'_blank','noopener');
+  if(a.startsWith('storage:')&&naNuvem){
+    const {data,error}=await sb.storage.from('arquivos').createSignedUrl(a.slice(8),3600);
+    if(error)return aviso('Não deu para abrir o arquivo');
+    window.open(data.signedUrl,'_blank','noopener');
+  }
+}
+
+/* ---- link de aprovação do cliente ---- */
+function urlAprovacao(c){return location.href.split(/[?#]/)[0].replace(/[^/]*$/,'')+'aprovar.html?c='+c.token}
+async function linkAprovacao(cid){
+  const c=cliDe(cid);
+  if(!c.token){c.token=tokenNovo();await gravar(dados)}
+  const pend=postsAbertos().filter(p=>p.clienteId===cid&&p.etapa==='aprovacao');
+  const url=urlAprovacao(c);
+  const txt=`Oi! Tem ${pend.length===1?'1 conteúdo':pend.length+' conteúdos'} esperando sua aprovação 😊\n\nÉ só abrir o link, ver e clicar em *Aprovar* ou *Pedir ajuste*:\n${url}\n\n— Cometa Digital`;
+  const z=(c.contato||'').replace(/\D/g,'');
+  abrirModal(`<h3>Aprovação · ${esc(c.nome)}</h3>
+    <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">Link exclusivo deste cliente. Ele vê só o que está na etapa <b>Aprovação do cliente</b> e responde por lá: aprovado vai para agendamento, ajuste volta para edição com o comentário.</p>
+    <div class="caixa-info" style="word-break:break-all;margin-bottom:12px">${esc(url)}</div>
+    <p style="font-size:13.5px">${pend.length?`<b>${pend.length}</b> esperando aprovação agora.`:'Nada esperando aprovação agora.'}</p>
+    <div class="dupla"><button class="btn sec" id="la-copiar">Copiar link</button>
+      <a class="btn esc" style="text-align:center;text-decoration:none;display:block;color:#fff" target="_blank"
+        href="https://wa.me/${z?(z.length>11?z:'55'+z):''}?text=${encodeURIComponent(txt)}">Mandar no WhatsApp</a></div>
+    <a class="btn sec" style="margin-top:8px;display:block;text-align:center;text-decoration:none" href="${esc(url)}" target="_blank">Ver como o cliente vê</a>
+    ${pode('editar_clientes')?'<button class="btn sec" style="margin-top:8px" id="la-novo">Trocar o link (o antigo para de funcionar)</button>':''}
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
+  document.getElementById('la-copiar').onclick=()=>{navigator.clipboard?.writeText(url);aviso('Link copiado')};
+  const n=document.getElementById('la-novo');
+  if(n)n.onclick=async()=>{if(!confirm('O link antigo vai parar de funcionar. Trocar?'))return;
+    c.token=tokenNovo();registrar('Trocou link de aprovação',c.nome);await gravar(dados);linkAprovacao(cid)};
+}
+
+/* ---- materiais pedidos ao cliente ---- */
+function textoCobranca(c,itens){
+  return `Oi! Tudo bem? Aqui é da Cometa 🚀\n\nPara seguirmos com o conteúdo de *${c.nome}*, ainda precisamos de:\n\n`+
+    itens.map(i=>`• ${i.descricao}${i.prazo?' (até '+i.prazo.split('-').reverse().slice(0,2).join('/')+')':''}`).join('\n')+
+    `\n\nPode mandar por aqui mesmo. Obrigado!`;
+}
+function cobrarMateriais(cid){
+  const c=cliDe(cid),itens=materiaisPend(cid);
+  if(!itens.length)return aviso('Nada pendente para cobrar');
+  const z=(c.contato||'').replace(/\D/g,'');
+  itens.forEach(m=>{m.ultimoLembrete=Date.now();m.lembretes=(m.lembretes||0)+1});
+  registrar('Cobrou materiais',c.nome);gravar(dados);
+  window.open('https://wa.me/'+(z?(z.length>11?z:'55'+z):'')+'?text='+encodeURIComponent(textoCobranca(c,itens)),'_blank');
+  redesenhar();
+}
+function formMaterial(cid){
+  if(!(pode('materiais')||pode('editar_clientes')))return aviso('Sem permissão');
+  abrirModal(`<h3>Pedir material · ${esc(nomeCli(cid))}</h3>
+    <div class="campo"><label>O que foi pedido</label><input id="ma-desc" placeholder="Fotos do cardápio novo, promoção do mês…"></div>
+    <div class="campo"><label>Precisa até</label><input type="date" id="ma-prazo" value="${somaDias(hojeISO(),3)}"></div>
+    <button class="btn" id="ma-salvar">Registrar pedido</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('ma-salvar').onclick=async()=>{
+    const d=document.getElementById('ma-desc').value.trim();
+    if(!d)return aviso('Escreva o que foi pedido');
+    dados.materiais.push({id:uid(),clienteId:cid,descricao:d,prazo:document.getElementById('ma-prazo').value||null,pedidoEm:Date.now(),recebidoEm:null,ultimoLembrete:null,lembretes:0});
+    registrar('Pediu material',nomeCli(cid)+' — '+d);
+    await gravar(dados);fecharModal();redesenhar();aviso('Pedido registrado');
+  };
+}
+function listaMateriais(cid,mostrarCliente){
+  const l=materiaisPend(cid).sort((a,b)=>String(a.prazo||'9').localeCompare(String(b.prazo||'9')));
+  const pm=pode('materiais')||pode('editar_clientes');
+  return l.map(m=>{const s=m.prazo?selo(m.prazo):null;return `<div class="item">
+    <div class="corpo"><div class="tit">${mostrarCliente?`<span class="dono">${esc(nomeCli(m.clienteId))}</span> · `:''}${esc(m.descricao)}</div>
+    <div class="sub">${s?`<span class="tag ${s.cls}">${s.cls==='atraso'?s.txt:'até '+s.txt.toLowerCase()}</span>`:'<span class="tag">sem prazo</span>'}
+      <span>pedido em ${curta(m.pedidoEm)}</span>${m.lembretes?`<span>${m.lembretes} lembrete(s)</span>`:''}</div></div>
+    ${pm?`<button class="ok" data-receb="${m.id}">recebi</button>`:''}</div>`}).join('');
+}
+function ligarMateriais(raiz){
+  raiz.querySelectorAll('[data-receb]').forEach(b=>b.onclick=async()=>{
+    const m=dados.materiais.find(x=>x.id===b.dataset.receb);m.recebidoEm=Date.now();
+    registrar('Recebeu material',nomeCli(m.clienteId)+' — '+m.descricao);
+    await gravar(dados);redesenhar();aviso('Material recebido',async()=>{m.recebidoEm=null;await gravar(dados);redesenhar()});
+  });
+}
+
+/* ---- ficha: postagens, materiais, contrato e alertas ---- */
+function pintarFichaProducao(cid){
+  const c=cliDe(cid),mes=mesAtual();
+  const doMes=(dados.postagens||[]).filter(p=>p.clienteId===cid&&(p.data||'').slice(0,7)===mes);
+  const pub=doMes.filter(p=>p.etapa==='publicado').length;
+  const meta=Number(c.postsMes)||0;
+  document.getElementById('f-post-cont').textContent=`${pub} de ${Math.max(doMes.length,meta)} publicadas este mês`+(meta?` · contrato: ${meta}/mês`+(doMes.length<meta?` · faltam ${meta-doMes.length} no calendário`:''):'');
+  const abertos=postsAbertos().filter(p=>p.clienteId===cid).sort((a,b)=>ordemSit[sitPost(a)]-ordemSit[sitPost(b)]||porPrioridade(a,b));
+  const recentes=(dados.postagens||[]).filter(p=>p.clienteId===cid&&p.etapa==='publicado').sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,4);
+  blocoPosts([...abertos,...recentes],'f-posts','<b>Nenhuma postagem</b>Planeje o calendário deste cliente com “+ Postagem”.',false);
+
+  const fm=document.getElementById('f-materiais');
+  const lm=listaMateriais(cid,false);
+  fm.innerHTML=(lm?`<div class="painel">${lm}</div>`:'<div class="nada" style="padding:18px">Nada pendente com o cliente.</div>')+
+    `<div class="acoes" style="margin-top:8px">${pode('materiais')||pode('editar_clientes')?'<button class="mini" id="b-pedir-mat">+ Pedir material</button>':''}
+     ${lm?'<button class="mini" id="b-cobrar-mat">Cobrar no WhatsApp</button>':''}</div>`;
+  ligarMateriais(fm);
+  const bp=document.getElementById('b-pedir-mat');if(bp)bp.onclick=()=>formMaterial(cid);
+  const bc=document.getElementById('b-cobrar-mat');if(bc)bc.onclick=()=>cobrarMateriais(cid);
+
+  const fim=c.contratoFim?diasAte(c.contratoFim):null;
+  const info=[
+    (c.servicosCli||[]).length?`<p><b>Serviços:</b> ${c.servicosCli.map(esc).join(' · ')}</p>`:'',
+    c.contratoInicio||c.contratoFim?`<p><b>Contrato:</b> ${c.contratoInicio?'desde '+c.contratoInicio.split('-').reverse().join('/'):''}${c.contratoFim?' até '+c.contratoFim.split('-').reverse().join('/'):''}
+      ${fim!==null&&fim<=30?`<span class="tag ${fim<0?'atraso':'amanha'}">${fim<0?'vencido':'vence em '+fim+' dias'}</span>`:''}</p>`:'',
+    c.respSocial||c.respTrafego?`<p><b>Responsáveis:</b> ${c.respSocial?'social: '+esc(c.respSocial):''}${c.respSocial&&c.respTrafego?' · ':''}${c.respTrafego?'tráfego: '+esc(c.respTrafego):''}</p>`:'',
+    c.briefing?`<p><b>Briefing:</b></p><p style="white-space:pre-wrap">${esc(c.briefing)}</p>`:'',
+    c.acessos&&pode('editar_clientes')?`<p><b>Links e acessos:</b></p><p style="white-space:pre-wrap">${esc(c.acessos)}</p>`:''
+  ].join('');
+  document.getElementById('f-contrato').innerHTML=info?`<div class="caixa-info">${info}</div>`
+    :`<div class="nada" style="padding:18px">Sem contrato e briefing cadastrados.${pode('editar_clientes')?' Use “Editar cadastro”.':''}</div>`;
+
+  const fa=document.getElementById('f-alertas');
+  const al=pode('meta_ver')?alertasAbertos(cid):[];
+  fa.innerHTML=al.length?`<div class="meta-alertas" style="margin-bottom:12px">${al.map(a=>`<div class="meta-alerta" style="display:flex;gap:8px;align-items:center"><span style="flex:1">🚨 ${esc(a.texto)}</span><button class="mini" data-resolver="${a.id}">resolvido</button></div>`).join('')}</div>`:'';
+  ligarAlertas(fa);
+}
+
+/* ============ CENTRAL DE COMANDO (visão geral) ============ */
+function cargaEquipe(){
+  const hoje=hojeISO(),cap=Number(cfg().capacidade)||15;
+  const nomes=[...new Set([...(dados.equipe||[]),...todasAbertas().map(a=>a.responsavel).filter(Boolean)])];
+  return nomes.map(n=>{
+    const at=todasAbertas().filter(a=>a.responsavel===n);
+    const ps=postsAbertos().filter(p=>donoPost(p)===n);
+    const atras=at.filter(a=>a.data&&a.data<hoje).length+ps.filter(p=>{const pr=prazosPost(p).prazos[p.etapa];return pr&&pr<hoje}).length;
+    const total=at.length+ps.length;
+    return{nome:n,tarefas:at.length,etapas:ps.length,videos:ps.filter(p=>ehVideo(p.formato)).length,atrasadas:atras,total,sobrecarga:total>cap};
+  }).sort((a,b)=>b.total-a.total);
+}
+function pintarCarga(alvo){
+  const l=cargaEquipe(),cap=Number(cfg().capacidade)||15;
+  document.getElementById(alvo).innerHTML=l.length?`<div class="painel">${l.map(x=>`<div class="item">
+    <div class="corpo"><div class="tit">${esc(x.nome)} ${x.sobrecarga?'<span class="tag atraso">sobrecarregado</span>':''}</div>
+    <div class="sub"><span>${x.tarefas} tarefa(s)</span><span>${x.etapas} etapa(s) de postagem</span>${x.videos?`<span>${x.videos} vídeo(s)</span>`:''}
+      ${x.atrasadas?`<span class="tag atraso">${x.atrasadas} atrasada(s)</span>`:''}</div></div>
+    <div class="barra-carga" title="${x.total} de ${cap}"><i style="width:${Math.min(100,x.total/cap*100)}%;background:${x.sobrecarga?'var(--atraso)':x.total>cap*.75?'var(--rastro)':'var(--ok)'}"></i></div>
+  </div>`).join('')}</div>`:'<div class="nada">Cadastre a equipe em Ajustes.</div>';
+}
+function emergencia(){
+  const hoje=hojeISO(),lim=somaDias(hoje,cfg().risco_dias);
+  const E=etapas(),iAg=E.findIndex(e=>e.k==='agendamento');
+  const l=postsAbertos().filter(p=>p.data&&p.data<=lim&&(p.data<hoje||iAg<0||idxEt(p.etapa)<iAg))
+    .sort((a,b)=>a.data.localeCompare(b.data)||porPrioridade(a,b));
+  const txt=`🚨 *Em risco até ${lim.split('-').reverse().slice(0,2).join('/')}*\n\n`+(l.length?l.map(p=>`• ${nomeCli(p.clienteId)} · ${p.titulo} (${dataPostTxt(p).txt}) → está em ${etapaDe(p).nome}${donoPost(p)?', com '+donoPost(p):''}`).join('\n'):'Nada em risco.');
+  abrirModal(`<h3>🚨 Em risco nos próximos ${cfg().risco_dias} dias</h3>
+    <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">Tudo que publica até ${lim.split('-').reverse().slice(0,2).join('/')} e ainda não está pronto para agendar, mais o que já passou da data.</p>
+    <div id="em-lista"></div>
+    <button class="btn sec" style="margin-top:12px" id="em-copiar">Copiar a lista (para mandar no grupo)</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
+  blocoPosts(l,'em-lista','<b>Nada em risco</b>Tudo dos próximos dias já está pronto para agendar.');
+  document.getElementById('em-copiar').onclick=()=>{navigator.clipboard?.writeText(txt);aviso('Lista copiada')};
+}
+function pintarSemaforo(alvo){
+  const ativos=ordenados().filter(c=>c.status!=='pausado').map(c=>({c,cor:corCliente(c.id)}));
+  const ordem={vermelho:0,amarelo:1,verde:2};
+  ativos.sort((a,b)=>ordem[a.cor]-ordem[b.cor]||a.c.nome.localeCompare(b.c.nome,'pt-BR'));
+  const n=k=>ativos.filter(x=>x.cor===k).length;
+  const el=document.getElementById(alvo);
+  el.innerHTML=ativos.length?`<div class="sem-resumo">${luz('vermelho')} ${n('vermelho')} atrasado(s) ${luz('amarelo')} ${n('amarelo')} em atenção ${luz('verde')} ${n('verde')} em dia</div>
+    <div class="semaforo">${ativos.map(x=>`<button class="sem-chip ${x.cor}" data-c="${x.c.id}"><i></i>${esc(x.c.nome)}</button>`).join('')}</div>`
+    :'<div class="nada">Nenhum cliente ativo.</div>';
+  el.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>abrirFicha(b.dataset.c));
+}
+
+/* ============ CALENDÁRIO ============ */
+let mesCal=mesAtual(),calCli='';
+function pintarCalendario(){
+  const sel=document.getElementById('cal-cli');
+  sel.innerHTML='<option value="">Todos os clientes</option>'+ordenados().map(c=>`<option value="${c.id}" ${calCli===c.id?'selected':''}>${esc(c.nome)}</option>`).join('');
+  esconder('b-nova-post',pode('postagens_editar'));
+  const [a,m]=mesCal.split('-').map(Number);
+  const todos=(dados.postagens||[]).filter(p=>(!calCli||p.clienteId===calCli)&&cliDe(p.clienteId).status!=='pausado');
+  const doMes=todos.filter(p=>(p.data||'').slice(0,7)===mesCal);
+  const pub=doMes.filter(p=>p.etapa==='publicado').length;
+  const meta=calCli?Number(cliDe(calCli).postsMes)||0:ordenados().filter(c=>c.status!=='pausado').reduce((s,c)=>s+(Number(c.postsMes)||0),0);
+  document.getElementById('cal-sub').textContent=nomeMes(mesCal)+(calCli?' · '+nomeCli(calCli):' · agência inteira');
+  document.getElementById('cal-kpis').innerHTML=`
+    <div class="kpi"><div class="rot">Previstas no mês</div><div class="num">${doMes.length}</div><div class="pe">${meta?'contratado: '+meta:'no calendário'}</div></div>
+    <div class="kpi verde"><div class="rot">Publicadas</div><div class="num">${pub}</div><div class="pe">${doMes.length?Math.round(pub/doMes.length*100)+'% do previsto':'—'}</div></div>
+    <div class="kpi ${doMes.some(p=>sitPost(p)==='atrasada')?'alerta':''}"><div class="rot">Atrasadas</div><div class="num">${doMes.filter(p=>sitPost(p)==='atrasada').length}</div><div class="pe">passou da data e não saiu</div></div>
+    <div class="kpi"><div class="rot">Em risco</div><div class="num" style="color:#B7791F">${doMes.filter(p=>sitPost(p)==='risco').length}</div><div class="pe">perto da data e não está pronta</div></div>`;
+  const primeiro=new Date(a,m-1,1),dias=new Date(a,m,0).getDate(),hoje=hojeISO();
+  let html='';
+  for(let i=0;i<primeiro.getDay();i++){const d=isoDe(new Date(a,m-1,i-primeiro.getDay()+1));html+=`<div class="cal-dia fora"><div class="cal-n"><span>${d.slice(8)}</span></div></div>`}
+  for(let d=1;d<=dias;d++){
+    const iso=`${mesCal}-${String(d).padStart(2,'0')}`;
+    const l=todos.filter(p=>p.data===iso).sort((x,y)=>String(x.hora||'99').localeCompare(String(y.hora||'99')));
+    const sem=new Date(iso+'T00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
+    html+=`<div class="cal-dia ${iso===hoje?'hoje':''} ${l.length?'':'vazio'}">
+      <div class="cal-n"><span><span class="so-cel">${sem} </span>${d}</span>${pode('postagens_editar')?`<button data-nova-dia="${iso}" title="Nova postagem neste dia">+</button>`:''}</div>
+      ${l.map(p=>`<button class="cal-p sit-${sitPost(p)}" data-post="${p.id}" title="${esc(nomeCli(p.clienteId)+' · '+p.titulo+' · '+etapaDe(p).nome)}">${p.hora?esc(p.hora)+' ':''}${calCli?'':'<b>'+esc(nomeCli(p.clienteId))+'</b> · '}${esc(p.titulo)}<small>${esc(etapaDe(p).nome)}</small></button>`).join('')}
+    </div>`;
+  }
+  const el=document.getElementById('cal');el.innerHTML=html;
+  ligarPosts(el);
+  el.querySelectorAll('[data-nova-dia]').forEach(b=>b.onclick=()=>formPostagem(null,{data:b.dataset.novaDia,clienteId:calCli||undefined}));
+  blocoPosts(todos.filter(p=>!p.data&&p.etapa!=='publicado'),'cal-semdata','<b>Tudo com data</b>Nenhuma postagem solta.');
+}
+function mudaMesCal(n){const [a,m]=mesCal.split('-').map(Number);const d=new Date(a,m-1+n,1);mesCal=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');pintarCalendario()}
+
+/* ============ FILA DE PRODUÇÃO ============ */
+let prodFiltro='video',prodMeus=false;
+function pintarProducao(){
+  document.querySelectorAll('[data-pf]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.pf==='meus'?prodMeus:b.dataset.pf===prodFiltro));
+  esconder('b-distribuir',pode('postagens_editar'));
+  const E=etapas().filter(e=>e.k!=='publicado');
+  let l=postsAbertos();
+  if(prodFiltro==='video')l=l.filter(p=>ehVideo(p.formato));
+  if(prodMeus)l=l.filter(p=>donoPost(p)===perfil.nome||[p.captador,p.editor,p.revisor,p.responsavel].includes(perfil.nome));
+  const el=document.getElementById('kanban');
+  el.innerHTML=E.map(e=>{
+    const col=l.filter(p=>p.etapa===e.k).sort(porPrioridade);
+    return `<div class="coluna"><h4>${esc(e.nome)} <span>${col.length}</span></h4>
+      ${col.map(p=>{const sit=sitPost(p),d=dataPostTxt(p),dono=donoPost(p),E2=etapas(),prox=E2[idxEt(p.etapa)+1];
+        const pr=prazosPost(p).prazos[p.etapa],sp=pr?selo(pr):null;
+        return `<div class="kcard sit-${sit}" data-post="${p.id}">
+          <div class="t">${esc(nomeCli(p.clienteId))} · ${esc(p.titulo)}</div>
+          <div class="s"><span class="tag">${esc(FORMATOS[p.formato]||p.formato)}</span><span class="tag ${sit==='atrasada'?'atraso':d.cls}">publica ${d.txt}</span>
+            ${p.prioridade==='alta'?'<span class="tag alta">prioridade</span>':''}</div>
+          <div class="s">${dono?(dono==='cliente'?'esperando o cliente':'👤 '+esc(dono)):'<span style="color:var(--atraso)">sem responsável</span>'}${sp?` · etapa até ${sp.txt.toLowerCase()}`:''}${p.dataGravacao&&e.k==='captacao'?' · grava '+p.dataGravacao.split('-').reverse().slice(0,2).join('/'):''}</div>
+          ${p.roteiro&&['captacao','edicao'].includes(e.k)?`<div class="s" style="font-style:italic">${esc(p.roteiro.slice(0,90))}${p.roteiro.length>90?'…':''}</div>`:''}
+          ${prox&&podeMover()?`<button class="ok" data-avanca="${p.id}">${esc(prox.k==='publicado'?'publicado ✓':prox.nome)} →</button>`:''}
+        </div>`}).join('')||'<div class="vazio-col">vazio</div>'}
+    </div>`;
+  }).join('');
+  ligarPosts(el);
+}
+function distribuir(){
+  const quem=(cfg().editores||[]).length?cfg().editores:dados.equipe;
+  if(!quem.length)return aviso('Cadastre a equipe em Ajustes');
+  const carga={};quem.forEach(n=>carga[n]=cargaEquipe().find(x=>x.nome===n)?.total||0);
+  const menor=()=>quem.reduce((a,b)=>carga[b]<carga[a]?b:a);
+  const E=etapas(),iEd=E.findIndex(e=>e.k==='edicao'),iCap=E.findIndex(e=>e.k==='captacao');
+  const mud=[];
+  postsAbertos().filter(p=>ehVideo(p.formato)).sort(porPrioridade).forEach(p=>{
+    const i=idxEt(p.etapa);
+    if(iCap>=0&&i<=iCap&&!p.captador){const n=menor();mud.push([p,'captador',n]);carga[n]++}
+    if(iEd>=0&&i<=iEd&&!p.editor){const n=menor();mud.push([p,'editor',n]);carga[n]++}
+  });
+  if(!mud.length)return aviso('Todos os vídeos já têm quem grava e quem edita');
+  abrirModal(`<h3>Distribuir vídeos</h3>
+    <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">Por ordem de publicação, para quem está com menos coisa${(cfg().editores||[]).length?' (entre: '+cfg().editores.map(esc).join(', ')+')':''}.</p>
+    <div class="painel">${mud.map(([p,campo,n])=>`<div class="item"><div class="corpo"><div class="tit">${esc(nomeCli(p.clienteId))} · ${esc(p.titulo)}</div>
+      <div class="sub"><span>${campo==='editor'?'edita':'grava'}: <b>${esc(n)}</b></span><span>publica ${dataPostTxt(p).txt}</span></div></div></div>`).join('')}</div>
+    <button class="btn" style="margin-top:12px" id="di-ok">Confirmar</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('di-ok').onclick=async()=>{
+    mud.forEach(([p,campo,n])=>{p[campo]=n});
+    registrar('Distribuiu vídeos',mud.length+' atribuição(ões)');
+    await gravar(dados);fecharModal();redesenhar();aviso('Vídeos distribuídos');
+  };
+}
+
+/* ============ MONITOR DE TRÁFEGO ============ */
+function ligarAlertas(raiz){
+  raiz.querySelectorAll('[data-resolver]').forEach(b=>b.onclick=async()=>{
+    const a=dados.alertas.find(x=>x.id===b.dataset.resolver);if(!a)return;
+    a.resolvidoEm=Date.now();a.resolvidoPor=perfil.nome;
+    if(naNuvem){
+      const {error}=await sb.from('alertas_anuncios').update({resolvido_em:new Date().toISOString()}).eq('id',a.id);
+      if(error){a.resolvidoEm=null;return aviso('Não deu: '+error.message)}
+    }else localSet(dados);
+    redesenhar();aviso('Alerta resolvido');
+  });
+}
+function pintarTrafego(){
+  const ab=alertasAbertos(),hoje=hojeISO();
+  const comConta=ordenados().filter(c=>c.status!=='pausado'&&c.metaContaId);
+  document.getElementById('tr-kpis').innerHTML=`
+    <div class="kpi ${ab.some(a=>a.gravidade==='alta')?'alerta':''}"><div class="rot">Alertas em aberto</div><div class="num">${ab.length}</div><div class="pe">${ab.filter(a=>a.gravidade==='alta').length} graves</div></div>
+    <div class="kpi"><div class="rot">Contas ligadas</div><div class="num">${comConta.length}</div><div class="pe">clientes com Meta no CRM</div></div>
+    <div class="kpi"><div class="rot">Com metas</div><div class="num">${comConta.filter(c=>c.metaCplMax||c.metaOrcDia||c.metaResDia).length}</div><div class="pe">custo/orçamento/resultado definidos</div></div>
+    <div class="kpi verde"><div class="rot">Resolvidos · 7 dias</div><div class="num">${(dados.alertas||[]).filter(a=>a.resolvidoEm&&Date.now()-a.resolvidoEm<7*864e5).length}</div><div class="pe">pela equipe</div></div>`;
+  const grupos={};ab.forEach(a=>(grupos[a.clienteId]=grupos[a.clienteId]||[]).push(a));
+  const ordemG={alta:0,media:1,baixa:2};
+  const el=document.getElementById('tr-alertas');
+  el.innerHTML=ab.length?Object.entries(grupos).map(([cid,l])=>`<div class="painel" style="margin-bottom:10px">
+      <div class="item" style="background:#F8F9FD"><div class="corpo"><div class="tit">${luz(l.some(a=>a.gravidade==='alta')?'vermelho':'amarelo')} ${esc(nomeCli(cid))}</div></div>
+        <button class="mini" data-ficha="${cid}">abrir ficha</button></div>
+      ${l.sort((a,b)=>ordemG[a.gravidade]-ordemG[b.gravidade]).map(a=>`<div class="item"><div class="corpo"><div class="tit" style="font-weight:500">${esc(a.texto)}</div>
+        <div class="sub"><span class="tag ${a.gravidade==='alta'?'atraso':a.gravidade==='media'?'amanha':''}">${a.gravidade}</span><span>${curta(a.criadoEm)}</span></div></div>
+        <button class="mini" data-resolver="${a.id}">resolvido</button></div>`).join('')}</div>`).join('')
+    :`<div class="nada"><b>Nenhuma exceção</b>${comConta.length?'As contas estão dentro do esperado.':'Ligue as contas de anúncio na ficha de cada cliente.'}</div>`;
+  ligarAlertas(el);
+  el.querySelectorAll('[data-ficha]').forEach(b=>b.onclick=()=>abrirFicha(b.dataset.ficha));
+  const ec=pode('editar_clientes');
+  document.getElementById('tr-contas').innerHTML=`<div class="painel">${ordenados().filter(c=>c.status!=='pausado'&&(c.metaContaId||(c.servicosCli||[]).includes('Tráfego pago'))).map(c=>`<div class="item">
+    <div class="corpo"><div class="tit">${esc(c.nome)} ${c.metaContaId?'':'<span class="tag atraso">sem conta ligada</span>'}</div>
+    <div class="sub">${c.metaContaNome?`<span>${esc(c.metaContaNome)}</span>`:''}
+      <span>orçamento/dia: ${c.metaOrcDia?brl(c.metaOrcDia):'—'}</span><span>custo máx.: ${c.metaCplMax?brl(c.metaCplMax):'—'}</span>
+      <span>resultados/dia: ${c.metaResDia||'—'}</span>${c.respTrafego?`<span>👤 ${esc(c.respTrafego)}</span>`:''}</div></div>
+    ${ec?`<button class="mini" data-metas="${c.id}">metas</button>`:''}</div>`).join('')||'<div class="nada">Nenhum cliente com tráfego.</div>'}</div>`;
+  document.querySelectorAll('[data-metas]').forEach(b=>b.onclick=()=>formMetas(b.dataset.metas));
+  const res=(dados.alertas||[]).filter(a=>a.resolvidoEm).sort((a,b)=>b.resolvidoEm-a.resolvidoEm).slice(0,10);
+  document.getElementById('tr-resolvidos').innerHTML=res.length?`<div class="painel">${res.map(a=>`<div class="item"><div class="corpo">
+    <div class="tit" style="font-weight:500"><span class="dono">${esc(nomeCli(a.clienteId))}</span> · ${esc(a.texto)}</div>
+    <div class="sub"><span class="tag rec">resolvido ${curta(a.resolvidoEm)}</span>${a.resolvidoPor?`<span>${esc(a.resolvidoPor)}</span>`:''}</div></div></div>`).join('')}</div>`
+    :'<div class="nada" style="padding:18px">Nada resolvido ainda.</div>';
+}
+function formMetas(cid){
+  const c=cliDe(cid);
+  abrirModal(`<h3>Metas de tráfego · ${esc(c.nome)}</h3>
+    <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">O monitor compara os números da conta com isto. Deixe em branco o que não quiser vigiar.</p>
+    <div class="campo"><label>Orçamento planejado por dia (R$)</label><input id="mt-orc" type="number" step="0.01" value="${esc(c.metaOrcDia||'')}"></div>
+    <div class="campo"><label>Custo máximo por conversa/lead (R$)</label><input id="mt-cpl" type="number" step="0.01" value="${esc(c.metaCplMax||'')}"></div>
+    <div class="campo"><label>Resultados esperados por dia</label><input id="mt-res" type="number" step="1" value="${esc(c.metaResDia||'')}"></div>
+    <div class="campo"><label>Responsável pelo tráfego (recebe os alertas no WhatsApp)</label><select id="mt-resp">${opcoesEquipe(c.respTrafego)}</select></div>
+    <button class="btn" id="mt-salvar">Salvar</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Cancelar</button>`);
+  document.getElementById('mt-salvar').onclick=async()=>{
+    c.metaOrcDia=document.getElementById('mt-orc').value;c.metaCplMax=document.getElementById('mt-cpl').value;
+    c.metaResDia=document.getElementById('mt-res').value;c.respTrafego=document.getElementById('mt-resp').value;
+    registrar('Mudou metas de tráfego',c.nome);await gravar(dados);fecharModal();redesenhar();aviso('Metas salvas');
+  };
+}
+async function monitorarAgora(bt){
+  bt.disabled=true;bt.textContent='Verificando…';
+  try{
+    const r=await chamarFuncao('meta',{acao:'monitorar'});
+    if(naNuvem){const {data}=await sb.from('alertas_anuncios').select('*').order('criado_em',{ascending:false}).limit(300);if(data)dados.alertas=data.map(deAlerta)}
+    else localSet(dados);
+    aviso(`${r.verificados} conta(s) verificada(s) · ${r.novos} alerta(s) novo(s)`+(r.erros?.length?` · ${r.erros.length} com erro`:''));
+    if(r.erros?.length)console.warn(r.erros);
+    redesenhar();
+  }catch(e){aviso(e.message)}
+  bt.disabled=false;bt.textContent='Verificar agora';
+}
+
+/* ============ RELATÓRIOS ============ */
+let mesRel=mesAtual();
+function numerosMes(cid,mes){
+  const posts=(dados.postagens||[]).filter(p=>p.clienteId===cid&&(p.data||'').slice(0,7)===mes);
+  const pub=posts.filter(p=>p.etapa==='publicado');
+  const noPrazo=pub.filter(p=>!p.publicadoEm||isoDe(new Date(p.publicadoEm))<=p.data).length;
+  const entregas=dados.atividades.filter(a=>a.clienteId===cid&&a.feitaEm&&isoDe(new Date(a.feitaEm)).slice(0,7)===mes);
+  return{posts,pub,noPrazo,entregas,meta:Number(cliDe(cid).postsMes)||0};
+}
+function pintarRelatorios(){
+  document.getElementById('rel-sub').textContent=nomeMes(mesRel)+' · social media, entregas e tráfego de cada cliente';
+  const l=ordenados().filter(c=>c.status!=='pausado');
+  document.getElementById('rel-lista').innerHTML=`<div class="painel">${l.map(c=>{const n=numerosMes(c.id,mesRel);return `<div class="item">
+    <div class="corpo"><div class="tit">${luz(corCliente(c.id))} ${esc(c.nome)}</div>
+    <div class="sub"><span>${n.pub.length} de ${Math.max(n.posts.length,n.meta)} postagens publicadas</span>${n.pub.length?`<span>${Math.round(n.noPrazo/n.pub.length*100)}% no prazo</span>`:''}
+      <span>${n.entregas.length} entrega(s)</span>${materiaisPend(c.id).length?`<span class="tag amanha">${materiaisPend(c.id).length} material(is) pendente(s)</span>`:''}</div></div>
+    <button class="mini" data-rel="${c.id}">relatório</button></div>`}).join('')}</div>`;
+  document.querySelectorAll('[data-rel]').forEach(b=>b.onclick=()=>abrirRelatorio(b.dataset.rel,mesRel));
+}
+function mudaMesRel(n){const [a,m]=mesRel.split('-').map(Number);const d=new Date(a,m-1+n,1);mesRel=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');pintarRelatorios()}
+async function abrirRelatorio(cid,mes){
+  const c=cliDe(cid),n=numerosMes(cid,mes),titMes=nomeMes(mes);
+  const porTipo={};n.entregas.forEach(a=>porTipo[a.titulo]=(porTipo[a.titulo]||0)+1);
+  const mesAnt=(()=>{const [a,m]=mesAtual().split('-').map(Number);const d=new Date(a,m-2,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')})();
+  const periodo=mes===mesAtual()?'mes':mes===mesAnt?'mes_passado':null;
+  abrirModal(`<h3>${esc(c.nome)} — ${titMes}</h3>
+    <div class="grade" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="kpi"><div class="rot">Postagens</div><div class="num">${n.pub.length}<span style="font-size:16px;color:var(--suave)">/${Math.max(n.posts.length,n.meta)}</span></div><div class="pe">publicadas / previstas</div></div>
+      <div class="kpi verde"><div class="rot">No prazo</div><div class="num">${n.pub.length?Math.round(n.noPrazo/n.pub.length*100)+'%':'—'}</div><div class="pe">das publicadas</div></div>
+    </div>
+    ${n.pub.length?`<div class="rotulo" style="margin-top:6px">Publicado</div><div class="painel">${n.pub.map(p=>`<div class="item"><div class="corpo"><div class="tit">${esc(p.titulo)}</div>
+      <div class="sub"><span class="tag">${esc(FORMATOS[p.formato]||p.formato)}</span><span>${p.data.split('-').reverse().slice(0,2).join('/')}</span>${p.link?`<a href="${esc(p.link)}" target="_blank" style="color:var(--cometa)">ver</a>`:''}</div></div></div>`).join('')}</div>`:''}
+    <div class="rotulo">Entregas (${n.entregas.length})</div>
+    ${Object.keys(porTipo).length?`<div class="painel">${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).map(([t,q])=>`<div class="item"><div class="corpo"><div class="tit">${esc(t)}</div></div><span class="tag">${q}x</span></div>`).join('')}</div>`:'<div class="nada" style="padding:16px">Nenhuma entrega registrada.</div>'}
+    <div class="rotulo">Tráfego pago</div><div id="rel-meta">${!c.metaContaId?'<div class="nada" style="padding:16px">Sem conta de anúncio ligada.</div>':!pode('meta_ver')?'<div class="nada" style="padding:16px">Sem permissão para ver anúncios.</div>':!periodo?'<div class="nada" style="padding:16px">A Meta só é consultada para este mês e o anterior.</div>':'<div class="carregando">Buscando na Meta…</div>'}</div>
+    <button class="btn sec" style="margin-top:12px" id="rel-pdf">Baixar PDF</button>
+    <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>`);
+  let trafego=null;
+  if(c.metaContaId&&pode('meta_ver')&&periodo){
+    try{
+      trafego=await chamarFuncao('meta',{acao:'resumo',clienteId:cid,periodo});
+      const t=trafego.total,res=t.conversas>=t.leads?{n:t.conversas,r:'conversas',c:t.custoConversa}:{n:t.leads,r:'leads',c:t.custoLead};
+      trafego.linhaRes=res;
+      const el=document.getElementById('rel-meta');
+      if(el)el.innerHTML=`<div class="grade" style="grid-template-columns:1fr 1fr;gap:10px">
+        <div class="kpi"><div class="rot">Investido</div><div class="num">${brl(t.gasto).replace(',00','')}</div><div class="pe">${inteiro(t.alcance)} pessoas alcançadas</div></div>
+        <div class="kpi verde"><div class="rot">${res.r}</div><div class="num">${inteiro(res.n)}</div><div class="pe">${res.c!=null?brl(res.c)+' cada':'—'}</div></div></div>
+        <div class="painel" style="margin-top:10px">${trafego.campanhas.filter(x=>x.gasto>0).slice(0,6).map(x=>`<div class="item"><div class="corpo"><div class="tit">${esc(x.nome)}</div>
+          <div class="sub"><span>${brl(x.gasto)}</span><span>${inteiro(x.conversas||x.leads)} ${x.conversas?'conversas':'leads'}</span></div></div></div>`).join('')||'<div class="item"><div class="corpo sub">Nenhuma campanha com gasto.</div></div>'}</div>`;
+    }catch(e){const el=document.getElementById('rel-meta');if(el)el.innerHTML=`<div class="meta-alerta">${esc(e.message)}</div>`}
+  }
+  document.getElementById('rel-pdf').onclick=async()=>{
+    const bt=document.getElementById('rel-pdf');bt.disabled=true;bt.textContent='Gerando…';
+    try{await carregarJsPDF()}catch(e){bt.disabled=false;bt.textContent='Baixar PDF';return aviso('Sem internet para gerar o PDF')}
+    const {jsPDF}=window.jspdf,doc=new jsPDF();let y=20;
+    const linhaPdf=(t,tam,cor,negrito)=>{if(y>275){doc.addPage();y=20}doc.setFont('helvetica',negrito?'bold':'normal');doc.setFontSize(tam||11);doc.setTextColor(...(cor||[22,27,61]));
+      doc.splitTextToSize(String(t),180).forEach(l=>{doc.text(l,14,y);y+=(tam||11)*.5})};
+    linhaPdf('Cometa Digital',18,[75,59,228],true);y+=2;
+    linhaPdf(c.nome+' — '+titMes,13);y+=2;doc.setDrawColor(225,228,240);doc.line(14,y,196,y);y+=8;
+    linhaPdf('Social media',13,null,true);y+=1;
+    linhaPdf(`Postagens publicadas: ${n.pub.length} de ${Math.max(n.posts.length,n.meta)} previstas`+(n.pub.length?` · ${Math.round(n.noPrazo/n.pub.length*100)}% no prazo`:''));
+    n.pub.forEach(p=>linhaPdf(`• ${p.data.split('-').reverse().slice(0,2).join('/')} · ${FORMATOS[p.formato]||p.formato} · ${p.titulo}`,10));
+    y+=4;linhaPdf('Entregas do mês: '+n.entregas.length,13,null,true);y+=1;
+    Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).forEach(([t,q])=>linhaPdf(`• ${t} — ${q}x`,10));
+    if(trafego){
+      y+=4;linhaPdf('Tráfego pago',13,null,true);y+=1;
+      linhaPdf(`Investido: ${brl(trafego.total.gasto)} · ${inteiro(trafego.linhaRes.n)} ${trafego.linhaRes.r}`+(trafego.linhaRes.c!=null?` · ${brl(trafego.linhaRes.c)} cada`:''));
+      linhaPdf(`Alcance: ${inteiro(trafego.total.alcance)} pessoas · ${inteiro(trafego.total.impressoes)} impressões · ${inteiro(trafego.total.cliques)} cliques`,10);
+      trafego.campanhas.filter(x=>x.gasto>0).slice(0,8).forEach(x=>linhaPdf(`• ${x.nome}: ${brl(x.gasto)} · ${inteiro(x.conversas||x.leads)} ${x.conversas?'conversas':'leads'}`,10));
+    }
+    doc.setFontSize(9);doc.setTextColor(120,126,150);doc.text('Gerado em '+new Date().toLocaleDateString('pt-BR')+' pelo Cometa CRM',14,288);
+    doc.save('relatorio-'+c.nome.replace(/\s+/g,'-').toLowerCase()+'-'+mes+'.pdf');
+    bt.disabled=false;bt.textContent='Baixar PDF';
+  };
+}
+
+/* ============ AJUSTES: etapas, checklist e regras ============ */
+let etapasEdit=[];
+function pintarEtapasEdit(){
+  const el=document.getElementById('aj-etapas');
+  el.innerHTML=etapasEdit.map((e,i)=>`<div class="linha-et">
+    <input data-et-nome="${i}" value="${esc(e.nome)}" ${e.k==='publicado'?'disabled':''}>
+    <input data-et-dias="${i}" type="number" min="0" value="${e.dias}" title="dias antes da publicação" ${e.k==='publicado'?'disabled':''}>
+    <select data-et-quem="${i}" ${e.k==='publicado'?'disabled':''}>${Object.entries(QUEM).map(([k,n])=>`<option value="${k}" ${e.quem===k?'selected':''}>${n}</option>`).join('')}</select>
+    <span style="display:flex;gap:3px">${e.k==='publicado'?'':`<button class="mini" data-et-sobe="${i}" title="subir">↑</button><button class="mini perigo" data-et-tira="${i}" title="tirar">✕</button>`}</span>
+  </div>`).join('');
+  const ler=()=>el.querySelectorAll('[data-et-nome]').forEach(x=>{const i=+x.dataset.etNome;etapasEdit[i].nome=x.value;
+    etapasEdit[i].dias=Number(el.querySelector(`[data-et-dias="${i}"]`).value)||0;etapasEdit[i].quem=el.querySelector(`[data-et-quem="${i}"]`).value});
+  el.oninput=el.onchange=ler;
+  el.querySelectorAll('[data-et-sobe]').forEach(b=>b.onclick=()=>{const i=+b.dataset.etSobe;if(i<1)return;[etapasEdit[i-1],etapasEdit[i]]=[etapasEdit[i],etapasEdit[i-1]];pintarEtapasEdit()});
+  el.querySelectorAll('[data-et-tira]').forEach(b=>b.onclick=()=>{const e=etapasEdit[+b.dataset.etTira];
+    if(dados.postagens.some(p=>p.etapa===e.k&&p.etapa!=='publicado'))return aviso('Tem postagem nessa etapa. Mova antes de tirar.');
+    etapasEdit.splice(+b.dataset.etTira,1);pintarEtapasEdit()});
+}
+function montarAjustesProducao(){
+  etapasEdit=etapas().map(e=>({...e}));pintarEtapasEdit();
+  document.getElementById('aj-checklist').value=(dados.checklist||CHECKLIST_PADRAO).map(x=>x.titulo+' | '+(x.dias||0)).join('\n');
+  const c=cfg();
+  document.getElementById('aj-cap').value=c.capacidade;document.getElementById('aj-risco').value=c.risco_dias;
+  document.getElementById('aj-editores').value=(c.editores||[]).join(', ');
+  document.getElementById('aj-bomdia').checked=!!c.bom_dia_whatsapp;document.getElementById('aj-alertazap').checked=!!c.alerta_whatsapp;
+  document.getElementById('aj-matauto').checked=!!c.lembrete_materiais_auto;
+  esconder('aj-rotinas',ehAdmin()&&naNuvem);
+}
+async function salvarAjustesProducao(){
+  const nova=etapasEdit.filter(e=>e.nome.trim());
+  dados.etapas=nova.map(e=>({k:e.k,nome:e.nome.trim(),dias:Math.max(0,Number(e.dias)||0),quem:e.quem}));
+  dados.checklist=document.getElementById('aj-checklist').value.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{
+    const [t,d]=l.split('|');return{titulo:t.trim(),dias:Math.max(0,parseInt(d)||0)}});
+  dados.config={...cfg(),capacidade:Math.max(1,parseInt(document.getElementById('aj-cap').value)||15),
+    risco_dias:Math.max(1,parseInt(document.getElementById('aj-risco').value)||3),
+    editores:document.getElementById('aj-editores').value.split(',').map(s=>s.trim()).filter(Boolean),
+    bom_dia_whatsapp:document.getElementById('aj-bomdia').checked,alerta_whatsapp:document.getElementById('aj-alertazap').checked,
+    lembrete_materiais_auto:document.getElementById('aj-matauto').checked};
+  registrar('Mudou ajustes de produção','');
+  await gravar(dados);aviso('Ajustes de produção salvos');
+}
+function novaEtapa(){etapasEdit.splice(etapasEdit.length-1,0,{k:'et'+uid(),nome:'Nova etapa',dias:1,quem:'responsavel'});pintarEtapasEdit()}
+async function rodarRotina(tarefa,bt){
+  const txt=bt.textContent;bt.disabled=true;bt.textContent='…';
+  try{const r=await chamarFuncao('meta',{acao:'rotina',tarefa});
+    aviso(r.motivo?r.motivo:tarefa==='publicacoes'?`${r.marcados} publicação(ões) confirmada(s)`:`${r.enviados} mensagem(ns) enviada(s)`)}
+  catch(e){aviso(e.message)}
+  bt.disabled=false;bt.textContent=txt;
+}
+
+document.getElementById('b-nova-post').onclick=()=>formPostagem(null,{clienteId:calCli||undefined});
+document.getElementById('cal-cli').onchange=e=>{calCli=e.target.value;pintarCalendario()};
+document.getElementById('cal-ant').onclick=()=>mudaMesCal(-1);
+document.getElementById('cal-prox').onclick=()=>mudaMesCal(1);
+document.getElementById('cal-hoje').onclick=()=>{mesCal=mesAtual();pintarCalendario()};
+document.querySelectorAll('[data-pf]').forEach(b=>b.onclick=()=>{if(b.dataset.pf==='meus')prodMeus=!prodMeus;else prodFiltro=b.dataset.pf;pintarProducao()});
+document.getElementById('b-distribuir').onclick=distribuir;
+document.getElementById('b-monitorar').onclick=e=>monitorarAgora(e.currentTarget);
+document.getElementById('rel-ant').onclick=()=>mudaMesRel(-1);
+document.getElementById('rel-prox').onclick=()=>mudaMesRel(1);
 
 /* ============ ENTRADA ============ */
 async function entrar(){
@@ -1888,7 +2850,8 @@ async function abrirSistema(){
   const s=await carregar();
   const offline=!!s?._offline;
   if(s)delete s._offline;
-  if(s&&s.clientes)dados={...dados,...s,pagamentos:s.pagamentos||{},compromissos:s.compromissos||[],log:s.log||[]};
+  if(s&&s.clientes)dados={...dados,...s,pagamentos:s.pagamentos||{},compromissos:s.compromissos||[],log:s.log||[],
+    postagens:s.postagens||[],materiais:s.materiais||[],alertas:s.alertas||[]};
   if(naNuvem){
     /* sem conexão: mostra a cópia do aparelho, mas não salva nada até conectar
        (senão uma cópia velha poderia sobrescrever o banco) */
@@ -1915,6 +2878,31 @@ async function abrirSistema(){
     dados.compromissos=[
       {id:uid(),tipo:'Captação',clienteId:'demo2',data:h(0),hora:'15:00',local:'Rua das Flores, 120',responsavel:'Bruno',obs:'Levar tripé',criadoEm:Date.now(),feitoEm:null},
       {id:uid(),tipo:'Reunião',clienteId:'demo5',data:h(1),hora:'10:00',local:'Av. Principal, 900',responsavel:'Ana',obs:'',criadoEm:Date.now(),feitoEm:null}];
+    dados.clientes.forEach((c,i)=>Object.assign(c,{token:tokenNovo(),postsMes:[12,8,12,8,8,16,12,8][i],respSocial:['Ana','Ana','Carla','Ana','Carla','Ana','Carla','Ana'][i],
+      respTrafego:i<3?'Bruno':'',servicosCli:i<3?['Social media','Tráfego pago','Produção de vídeo']:['Social media'],
+      contratoInicio:h(-200+i*20),contratoFim:i===4?h(20):h(160),briefing:i===0?'Tom acolhedor e familiar. Público: bairro, 25-55 anos. Mostrar pão saindo do forno. Não usar gírias.':'',
+      ...(i<3?{metaOrcDia:[30,45,40][i],metaCplMax:[7,9,6][i],metaResDia:[5,6,8][i]}:{})}));
+    const ev=t=>[{ts:new Date().toISOString(),quem:'Ana',txt:t}];
+    const po=(c,titulo,formato,dia,etapa,extra)=>({id:uid(),clienteId:'demo'+c,titulo,formato,etapa,data:h(dia),hora:'18:00',prioridade:'normal',
+      responsavel:['Ana','Ana','Carla','Ana','Carla','Ana','Carla','Ana'][c],captador:ehVideo(formato)?'Bruno':'',editor:ehVideo(formato)?'Carla':'',revisor:'Ana',
+      dataGravacao:ehVideo(formato)?h(dia-5):null,roteiro:ehVideo(formato)?'Abertura com o produto, 3 cenas curtas, chamada para o WhatsApp no final.':'',
+      legenda:'',arquivo:'',link:'',obs:'',aprovacao:etapa==='aprovacao'?'pendente':null,aprovacaoComentario:'',eventos:ev('Criou a postagem'),
+      etapaDesde:Date.now(),publicadoEm:etapa==='publicado'?Date.now()-Math.max(0,-dia)*864e5:null,criadoEm:Date.now(),...extra});
+    dados.postagens=[
+      po(0,'Pão de fermentação natural','reels',-1,'edicao',{prioridade:'alta'}),po(0,'Café da manhã completo','feed',2,'aprovacao'),
+      po(0,'Bastidores da padaria','stories',5,'pauta'),po(0,'Promoção de segunda','carrossel',-6,'publicado',{link:'https://instagram.com'}),
+      po(1,'Treino de 15 minutos','reels',1,'captacao'),po(1,'Depoimento de aluna','video',6,'producao'),po(1,'Horários novos','arte',-3,'publicado'),
+      po(2,'Pizza saindo do forno','reels',0,'agendamento'),po(2,'Rodízio de quinta','feed',3,'revisao'),po(2,'Novo sabor do mês','carrossel',9,'pauta'),
+      po(3,'Óculos de sol: tendências','carrossel',4,'aprovacao',{aprovacao:'ajustes',aprovacaoComentario:'Trocar a foto da capa por uma com modelo.'}),
+      po(4,'Banho e tosa: antes e depois','reels',7,'captacao'),po(5,'Clareamento: perguntas comuns','carrossel',2,'edicao'),
+      po(6,'Combo da semana','feed',-2,'aprovacao'),po(7,'Coleção de verão','reels',11,'pauta'),po(5,'Equipe da clínica','feed',-8,'publicado')];
+    dados.materiais=[
+      {id:uid(),clienteId:'demo0',descricao:'Fotos dos produtos novos',prazo:h(-2),pedidoEm:Date.now()-5*864e5,recebidoEm:null,ultimoLembrete:null,lembretes:1},
+      {id:uid(),clienteId:'demo6',descricao:'Preço do combo da semana',prazo:h(1),pedidoEm:Date.now()-864e5,recebidoEm:null,ultimoLembrete:null,lembretes:0},
+      {id:uid(),clienteId:'demo2',descricao:'Logo em alta resolução',prazo:h(3),pedidoEm:Date.now()-2*864e5,recebidoEm:null,ultimoLembrete:null,lembretes:0}];
+    dados.alertas=[
+      {id:uid(),clienteId:'demo1',tipo:'sem_resultado',gravidade:'alta',campanha:'Matrículas',texto:'Exemplo: "Matrículas" gastou R$ 64,00 em 7 dias sem nenhuma conversa ou lead.',criadoEm:Date.now()-3600e3,resolvidoEm:null},
+      {id:uid(),clienteId:'demo2',tipo:'orcamento',gravidade:'media',campanha:'',texto:'Exemplo: gastou R$ 52,30 ontem (planejado: R$ 40,00 por dia).',criadoEm:Date.now()-7200e3,resolvidoEm:null}];
     await gravar(dados);
   }
   ouvirNuvem();

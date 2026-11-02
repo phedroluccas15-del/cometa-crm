@@ -6,6 +6,10 @@ import {
   NOME_RECORRENCIA, pode, RECORRENCIA, somaDias, type Consulta, type Perfil,
 } from './regras.ts';
 import * as meta from './meta.ts';
+import {
+  donoAtual, EH_VIDEO, etapasValidas, FORMATOS, indiceEtapa, prazosEtapas, semaforo, situacao, type Etapa, type Postagem,
+} from './producao.ts';
+import { COLS_POST } from './rotinas.ts';
 
 export type Ctx = {
   q: Consulta;
@@ -34,7 +38,8 @@ export const FERRAMENTAS = [
   {
     name: 'panorama',
     description: 'Resumo da agência agora: o que está atrasado, o que vence hoje e amanhã, carga de cada pessoa, ' +
-      'semáforo dos clientes (vermelho = tem atraso, amarelo = vence hoje/amanhã, verde = em dia) e compromissos de hoje e amanhã. ' +
+      'semáforo dos clientes (vermelho = postagem que passou da data e não saiu ou tarefa atrasada, amarelo = postagem em risco, verde = em dia), ' +
+      'números das postagens (atrasadas, em risco, aprovações pendentes, vídeos na edição) e compromissos de hoje e amanhã. ' +
       'Use para "como estamos?", "o que tem pra hoje?", "quem está atrasado?".',
     type: 'function', parameters: { type: 'object', properties: {}, additionalProperties: false },
   },
@@ -211,6 +216,81 @@ export const FERRAMENTAS = [
     },
   },
   {
+    name: 'listar_postagens',
+    description: 'Calendário editorial e fila de produção: postagens/vídeos com etapa atual (pauta, produção, captação, edição, revisão, ' +
+      'aprovação do cliente, agendamento, publicado), data de publicação, quem precisa agir e situação (atrasada, em risco, ok). ' +
+      'Use para "o que tem pra postar", "o que está atrasado", "fila de edição", "o que está esperando aprovação".',
+    type: 'function', parameters: {
+      type: 'object',
+      properties: {
+        filtro: { type: 'string', enum: ['atrasadas', 'em_risco', 'hoje', 'semana', 'aguardando_aprovacao', 'fila_edicao', 'abertas', 'publicadas_mes'] },
+        cliente: { type: 'string' },
+        responsavel: { type: 'string', description: 'quem precisa agir agora; "eu" para quem está falando' },
+      },
+      required: ['filtro'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'criar_postagem',
+    description: 'Coloca uma postagem/vídeo no calendário de um cliente. Datas em AAAA-MM-DD.',
+    type: 'function', parameters: {
+      type: 'object',
+      properties: {
+        cliente: { type: 'string' },
+        titulo: { type: 'string', description: 'tema do conteúdo' },
+        formato: { type: 'string', enum: Object.keys(FORMATOS) },
+        data_publicacao: { type: 'string' },
+        hora: { type: 'string', description: 'HH:MM' },
+        responsavel: { type: 'string' }, captador: { type: 'string' }, editor: { type: 'string' },
+        roteiro: { type: 'string' }, legenda: { type: 'string' },
+        prioridade: { type: 'string', enum: ['normal', 'alta'] },
+      },
+      required: ['cliente', 'titulo', 'formato'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'mover_postagem',
+    description: 'Muda a etapa de uma postagem pelo id (ex.: captação feita → edição). etapa = "proxima" avança uma. ' +
+      'Para publicado, mande o link se tiver.',
+    type: 'function', parameters: {
+      type: 'object',
+      properties: {
+        postagem_id: { type: 'string' },
+        etapa: { type: 'string', description: '"proxima" ou a chave da etapa (pauta, producao, captacao, edicao, revisao, aprovacao, agendamento, publicado)' },
+        link: { type: 'string' },
+        comentario: { type: 'string' },
+      },
+      required: ['postagem_id', 'etapa'],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: 'alertas_anuncios',
+    description: 'Exceções encontradas pelo monitor de anúncios (campanha sem entrega, gastando sem resultado, custo acima da meta, ' +
+      'queda de resultados, orçamento estourado, conta sem acompanhamento) ainda não resolvidas.',
+    type: 'function', parameters: {
+      type: 'object', properties: { cliente: { type: 'string' } }, additionalProperties: false,
+    },
+  },
+  {
+    name: 'materiais',
+    description: 'Materiais pedidos aos clientes (fotos, informações, promoções): lista os pendentes, pede um novo ou marca como recebido.',
+    type: 'function', parameters: {
+      type: 'object',
+      properties: {
+        acao: { type: 'string', enum: ['listar', 'pedir', 'recebido'] },
+        cliente: { type: 'string' },
+        descricao: { type: 'string', description: 'pedir: o que foi pedido' },
+        prazo: { type: 'string', description: 'pedir: AAAA-MM-DD' },
+        material_id: { type: 'string', description: 'recebido: id que veio da lista' },
+      },
+      required: ['acao'],
+      additionalProperties: false,
+    },
+  },
+  {
     name: 'equipe',
     description: 'Nomes das pessoas da equipe (para saber a quem atribuir uma tarefa).',
     type: 'function', parameters: { type: 'object', properties: {}, additionalProperties: false },
@@ -304,6 +384,28 @@ function exigirConta(c: Cliente) {
   if (!c.meta_conta_id) recusa(`${c.nome} ainda não tem conta de anúncio ligada. Ligue na ficha do cliente, na parte "Anúncios".`);
 }
 
+
+// ---------- postagens ----------
+async function etapasDe(ctx: Ctx): Promise<{ E: Etapa[]; risco: number }> {
+  const [a] = await ctx.q(`select etapas, config from public.ajustes where id = 'principal'`);
+  return { E: etapasValidas(a?.etapas), risco: Number(a?.config?.risco_dias) || 3 };
+}
+const SQL_POSTS = `select ${COLS_POST}, p.link_publicado, p.publicado_em, p.eventos, c.nome as cliente
+  from public.postagens p join public.clientes c on c.id = p.cliente_id`;
+
+function linhaPost(p: any, E: Etapa[], hoje: string, risco: number) {
+  const e = E[indiceEtapa(E, p.etapa)];
+  const dono = donoAtual(p, E);
+  const prazo = prazosEtapas(p, E, hoje).prazos[p.etapa];
+  return {
+    id: p.id, cliente: p.cliente, titulo: p.titulo, formato: FORMATOS[p.formato] || p.formato,
+    etapa: e?.nome || p.etapa, publica: fmtData(p.data_publicacao, hoje).replace('atrasada', 'atrasado') + (p.hora ? ' ' + p.hora : ''),
+    situacao: situacao(p, E, hoje, risco), ...(dono ? { com: dono === 'cliente' ? 'esperando o cliente aprovar' : dono } : {}),
+    ...(prazo && p.etapa !== 'publicado' ? { prazo_da_etapa: fmtData(prazo, hoje) } : {}),
+    ...(p.prioridade === 'alta' ? { prioridade: 'alta' } : {}),
+  };
+}
+
 // ============================================================
 // Execução
 // ============================================================
@@ -328,14 +430,21 @@ const ACOES: Record<string, (ctx: Ctx, e: any) => Promise<Resultado>> = {
     }
 
     const ativos = (await clientes(ctx)).filter(c => c.status !== 'pausado');
-    const semaforo = { vermelho: [] as string[], amarelo: [] as string[], verde: [] as string[] };
+    const sem = { vermelho: [] as string[], amarelo: [] as string[], verde: [] as string[] };
+    let postagens: Resultado = {};
     if (tudo) {
+      const { E, risco } = await etapasDe(ctx);
+      const posts: Postagem[] = await ctx.q(SQL_POSTS + ` where p.etapa <> 'publicado'`);
       for (const c of ativos) {
-        const dele = abertas.filter(a => a.cliente_id === c.id);
-        if (dele.some(a => a.data && a.data < hoje)) semaforo.vermelho.push(c.nome);
-        else if (dele.some(a => a.data && a.data <= somaDias(hoje, 1))) semaforo.amarelo.push(c.nome);
-        else semaforo.verde.push(c.nome);
+        const cor = semaforo(posts.filter(p => p.cliente_id === c.id), E, hoje, risco);
+        // tarefa atrasada também deixa o cliente vermelho
+        const atrasoTarefa = abertas.some(a => a.cliente_id === c.id && a.data && a.data < hoje);
+        sem[atrasoTarefa ? 'vermelho' : cor].push(c.nome);
       }
+      const s = (k: string) => posts.filter(p => situacao(p, E, hoje, risco) === k).length;
+      postagens = { atrasadas: s('atrasada'), em_risco: s('risco'), publicar_hoje: posts.filter(p => p.data_publicacao === hoje).length,
+        aguardando_aprovacao: posts.filter(p => p.etapa === 'aprovacao').length,
+        videos_na_edicao: posts.filter(p => EH_VIDEO(p.formato) && p.etapa === 'edicao').length };
     }
     const comp = await ctx.q(`select k.id, k.tipo, k.data::text, k.hora, k.local, k.responsavel, c.nome as cliente
         from public.compromissos k left join public.clientes c on c.id = k.cliente_id
@@ -351,7 +460,7 @@ const ACOES: Record<string, (ctx: Ctx, e: any) => Promise<Resultado>> = {
       hoje_vence: { total: deHoje.length, itens: deHoje.slice(0, 15).map(a => linhaTarefa(a, hoje)) },
       amanha_vence: { total: amanha.length, itens: amanha.slice(0, 10).map(a => linhaTarefa(a, hoje)) },
       por_pessoa: porPessoa,
-      ...(tudo ? { semaforo_clientes: semaforo, entregues_7_dias: entregues?.n ?? 0 } : {}),
+      ...(tudo ? { semaforo_clientes: sem, postagens, entregues_7_dias: entregues?.n ?? 0 } : {}),
       compromissos_hoje_amanha: comp.filter((k: any) => tudo || k.responsavel === ctx.perfil.nome).map((k: any) => ({
         id: k.id, tipo: k.tipo, cliente: k.cliente, quando: fmtData(k.data, hoje), hora: k.hora, local: k.local, responsavel: k.responsavel,
       })),
@@ -618,6 +727,120 @@ const ACOES: Record<string, (ctx: Ctx, e: any) => Promise<Resultado>> = {
     const r = await meta.alterar(cfgMeta(ctx, await tokenMeta(ctx, c.id)), c.meta_conta_id!, e.campanha_id, mud);
     await registrar(ctx, 'Alterou campanha na Meta', `${c.nome} — ${r.nomeAntes}: ${descricao}`);
     return { feito: true, cliente: c.nome, campanha: r.nomeAntes, antes: r.antes, depois: r.depois };
+  },
+
+  async listar_postagens(ctx, e) {
+    const hoje = hojeSP(ctx.agora);
+    const { E, risco } = await etapasDe(ctx);
+    const cli = e.cliente ? await umCliente(ctx, e.cliente) : null;
+    const resp = await umaPessoa(ctx, e.responsavel);
+    let r: any[] = await ctx.q(SQL_POSTS + ` where c.status <> 'pausado'` + (cli ? ' and p.cliente_id = $1' : '') +
+      ' order by p.data_publicacao nulls last, p.prioridade', cli ? [cli.id] : []);
+    const sit = (p: any) => situacao(p, E, hoje, risco);
+    const f = e.filtro;
+    if (f === 'publicadas_mes') r = r.filter(p => p.etapa === 'publicado' && String(p.data_publicacao || '').slice(0, 7) === hoje.slice(0, 7));
+    else {
+      r = r.filter(p => p.etapa !== 'publicado');
+      if (f === 'atrasadas') r = r.filter(p => sit(p) === 'atrasada');
+      if (f === 'em_risco') r = r.filter(p => sit(p) === 'risco');
+      if (f === 'hoje') r = r.filter(p => p.data_publicacao === hoje);
+      if (f === 'semana') r = r.filter(p => p.data_publicacao && p.data_publicacao <= somaDias(hoje, 7));
+      if (f === 'aguardando_aprovacao') r = r.filter(p => p.etapa === 'aprovacao');
+      if (f === 'fila_edicao') r = r.filter(p => EH_VIDEO(p.formato) && ['producao', 'captacao', 'edicao', 'revisao'].includes(p.etapa))
+        .sort((a, b) => (a.prioridade === 'alta' ? 0 : 1) - (b.prioridade === 'alta' ? 0 : 1) || String(a.data_publicacao || '9').localeCompare(String(b.data_publicacao || '9')));
+    }
+    if (resp) r = r.filter(p => donoAtual(p, E) === resp);
+    return {
+      filtro: f, cliente: cli?.nome || 'todos', ...(resp ? { com: resp } : {}),
+      total: r.length, postagens: r.slice(0, 40).map(p => linhaPost(p, E, hoje, risco)),
+    };
+  },
+
+  async criar_postagem(ctx, e) {
+    exigir(ctx, 'postagens_editar', 'criar postagens');
+    const cli = await umCliente(ctx, e.cliente);
+    const titulo = String(e.titulo || '').trim();
+    if (!titulo) recusa('Falta o tema da postagem.');
+    if (!FORMATOS[e.formato]) recusa('Formato inválido.');
+    if (e.data_publicacao && !ehDataISO(e.data_publicacao)) recusa('Data inválida, use AAAA-MM-DD.');
+    if (e.hora && !/^\d{2}:\d{2}$/.test(e.hora)) recusa('Hora inválida, use HH:MM.');
+    const [resp, capt, edit] = [await umaPessoa(ctx, e.responsavel), await umaPessoa(ctx, e.captador), await umaPessoa(ctx, e.editor)];
+    const [c2] = await ctx.q(`select resp_social from public.clientes where id = $1`, [cli.id]);
+    const id = novoId();
+    const ev = [{ ts: ctx.agora.toISOString(), quem: ctx.perfil.nome + ' (Cometinha)', txt: 'Criou a postagem' }];
+    await ctx.q(`insert into public.postagens (id, cliente_id, titulo, formato, data_publicacao, hora, responsavel, captador, editor,
+                   roteiro, legenda, prioridade, eventos) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [id, cli.id, titulo, e.formato, e.data_publicacao || null, e.hora || null, resp || c2?.resp_social || null, capt, edit,
+        e.roteiro || null, e.legenda || null, e.prioridade === 'alta' ? 'alta' : 'normal', JSON.stringify(ev)]);
+    await registrar(ctx, 'Criou postagem', `${cli.nome} — ${titulo}`);
+    return { feito: true, id, cliente: cli.nome, titulo, formato: FORMATOS[e.formato], publica: fmtData(e.data_publicacao || null, hojeSP(ctx.agora)) };
+  },
+
+  async mover_postagem(ctx, e) {
+    if (!pode(ctx.perfil, 'postagens_mover')) exigir(ctx, 'postagens_editar', 'mudar a etapa das postagens');
+    const { E, risco } = await etapasDe(ctx);
+    const [p] = await ctx.q(SQL_POSTS + ' where p.id = $1', [e.postagem_id]);
+    if (!p) recusa('Não achei essa postagem. Liste de novo.');
+    const i = indiceEtapa(E, p.etapa);
+    const destino = e.etapa === 'proxima' ? E[Math.min(i + 1, E.length - 1)]
+      : E.find(x => x.k === e.etapa || normalizar(x.nome) === normalizar(e.etapa));
+    if (!destino) recusa(`Etapa inválida. Etapas: ${E.map(x => x.k).join(', ')}.`);
+    if (destino!.k === p.etapa) return { feito: false, motivo: `Já está em ${destino!.nome}.` };
+    const ev = [...(p.eventos || []), { ts: ctx.agora.toISOString(), quem: ctx.perfil.nome + ' (Cometinha)',
+      txt: `${E[i]?.nome} → ${destino!.nome}` + (e.comentario ? ': ' + e.comentario : '') }];
+    const publicado = destino!.k === 'publicado';
+    await ctx.q(`update public.postagens set etapa = $2, eventos = $3, etapa_desde = now(),
+        aprovacao = case when $2 = 'aprovacao' then 'pendente' else aprovacao end,
+        link_publicado = coalesce($4, link_publicado),
+        publicado_em = case when $5::boolean then coalesce(publicado_em, now()) else null end where id = $1`,
+      [p.id, destino!.k, JSON.stringify(ev), e.link || null, publicado]);
+    await registrar(ctx, 'Moveu postagem', `${p.cliente} — ${p.titulo}: ${destino!.nome}`);
+    const [n] = await ctx.q(SQL_POSTS + ' where p.id = $1', [p.id]);
+    return { feito: true, postagem: linhaPost(n, E, hojeSP(ctx.agora), risco),
+      ...(destino!.k === 'aprovacao' ? { lembrete: 'Mande o link de aprovação para o cliente (botão na ficha do cliente).' } : {}) };
+  },
+
+  async alertas_anuncios(ctx, e) {
+    exigir(ctx, 'meta_ver', 'ver os alertas de anúncios');
+    const cli = e.cliente ? await umCliente(ctx, e.cliente) : null;
+    const r = await ctx.q(`select a.id, a.tipo, a.gravidade, a.campanha, a.texto, a.criado_em, c.nome cliente
+        from public.alertas_anuncios a left join public.clientes c on c.id = a.cliente_id
+       where a.resolvido_em is null ${cli ? 'and a.cliente_id = $1' : ''} order by a.criado_em desc limit 40`, cli ? [cli.id] : []);
+    return { total: r.length, alertas: r.map((a: any) => ({ cliente: a.cliente, gravidade: a.gravidade, texto: a.texto,
+      desde: new Date(a.criado_em).toISOString().slice(0, 10) })) };
+  },
+
+  async materiais(ctx, e) {
+    const hoje = hojeSP(ctx.agora);
+    if (e.acao === 'listar') {
+      const cli = e.cliente ? await umCliente(ctx, e.cliente) : null;
+      const r = await ctx.q(`select m.id, m.descricao, m.prazo::text, m.lembretes, c.nome cliente from public.materiais m
+          join public.clientes c on c.id = m.cliente_id where m.recebido_em is null ${cli ? 'and m.cliente_id = $1' : ''}
+          order by m.prazo nulls last`, cli ? [cli.id] : []);
+      return { pendentes: r.map((m: any) => ({ id: m.id, cliente: m.cliente, material: m.descricao,
+        prazo: fmtData(m.prazo, hoje), lembretes_enviados: m.lembretes })) };
+    }
+    if (!pode(ctx.perfil, 'materiais')) exigir(ctx, 'editar_clientes', 'mexer nos materiais');
+    if (e.acao === 'pedir') {
+      const cli = await umCliente(ctx, e.cliente);
+      const d = String(e.descricao || '').trim();
+      if (!d) recusa('Diga o que foi pedido.');
+      if (e.prazo && !ehDataISO(e.prazo)) recusa('Prazo inválido.');
+      const id = novoId();
+      await ctx.q(`insert into public.materiais (id, cliente_id, descricao, prazo) values ($1,$2,$3,$4)`, [id, cli.id, d, e.prazo || null]);
+      await registrar(ctx, 'Pediu material', `${cli.nome} — ${d}`);
+      return { feito: true, id, cliente: cli.nome, material: d, prazo: fmtData(e.prazo || null, hoje) };
+    }
+    if (e.acao === 'recebido') {
+      const [m] = await ctx.q(`select m.id, m.descricao, c.nome cliente from public.materiais m join public.clientes c on c.id = m.cliente_id
+          where m.id = $1`, [e.material_id]);
+      if (!m) recusa('Não achei esse material.');
+      await ctx.q(`update public.materiais set recebido_em = now() where id = $1`, [m.id]);
+      await registrar(ctx, 'Recebeu material', `${m.cliente} — ${m.descricao}`);
+      return { feito: true, cliente: m.cliente, material: m.descricao };
+    }
+    recusa('Ação inválida.');
+    return {};
   },
 
   async equipe(ctx) {

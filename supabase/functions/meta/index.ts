@@ -8,8 +8,11 @@
 //   chave        { clienteId, token, expiraEm? }   (admin: chave própria do cliente, exceção)
 //   apagar_chave { clienteId }                      (admin)
 //   info_chave   { clienteId }                      (admin: só diz se existe e quando vence)
+//   monitorar                                       → roda o monitor de anúncios agora (botão "verificar agora")
+//   rotina       { tarefa }                         (admin: roda bom_dia, materiais ou publicacoes na hora)
 
-import { autenticar, ErroHttp, json, metaCfg, q, servir } from '../_shared/servidor.ts';
+import { autenticar, enviarPelaEvolution, ErroHttp, json, metaCfg, q, servir } from '../_shared/servidor.ts';
+import { bomDia, cobrarMateriais, conferirPublicacoes, monitor } from '../_shared/rotinas.ts';
 import * as meta from '../_shared/meta.ts';
 import { pode, type Perfil } from '../_shared/regras.ts';
 import { tokenMeta } from '../_shared/ferramentas.ts';
@@ -94,6 +97,18 @@ servir(async req => {
         if (perfil.papel !== 'admin') throw new ErroHttp(403, 'Só administrador.');
         const [t] = await q(`select expira_em::text, criado_em from privado.meta_tokens where cliente_id = $1`, [b.clienteId]);
         return json({ propria: !!t, expiraEm: t?.expira_em || null, padraoConfigurado: !!base.tokenPadrao });
+      }
+      case 'monitorar': {
+        exigir(perfil, 'meta_ver');
+        return json(await monitor({ q, agora: new Date(), meta: base, enviar: enviarPelaEvolution() }));
+      }
+      case 'rotina': {
+        if (perfil.papel !== 'admin') throw new ErroHttp(403, 'Só administrador.');
+        const d = { q, agora: new Date(), meta: base, enviar: enviarPelaEvolution() };
+        if (b.tarefa === 'bom_dia') return json(await bomDia(d));
+        if (b.tarefa === 'materiais') return json(await cobrarMateriais(d, true));
+        if (b.tarefa === 'publicacoes') return json(await conferirPublicacoes(d));
+        throw new ErroHttp(400, 'Rotina desconhecida.');
       }
       default:
         throw new ErroHttp(400, 'Ação desconhecida.');

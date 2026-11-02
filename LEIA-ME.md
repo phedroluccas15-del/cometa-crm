@@ -1,4 +1,4 @@
-# Cometa CRM — com Cometinha e Meta
+# Cometa CRM — produção, aprovações, Meta e Cometinha
 
 CRM de agência de marketing: clientes, tarefas, agenda externa, financeiro,
 anúncios da Meta e o **Cometinha**, um assistente com IA que conversa por
@@ -29,6 +29,27 @@ Funciona no computador e no celular, instalável como aplicativo.
   campanha (sempre pedindo confirmação antes). Respeita as permissões de cada
   pessoa. Entende áudio.
 - **Cometinha no WhatsApp** pela Evolution API: só responde números da equipe.
+- **Central de comando**: postagens atrasadas, para hoje, em risco, aprovações pendentes,
+  vídeos na fila, anúncios com problema, semáforo dos clientes, prazos vencendo, quem deve
+  material e a carga de cada pessoa. Botão **Emergência** lista tudo que publica nos próximos
+  dias e ainda não está pronto.
+- **Postagens em 8 etapas** (pauta → produção → captação → edição → revisão → aprovação do
+  cliente → agendamento → publicado). O prazo de cada etapa conta para trás a partir da data de
+  publicação; se uma etapa atrasa, as próximas são reorganizadas. Etapas, prazos e quem faz
+  cada uma se mudam em **Ajustes**.
+- **Calendário** de cada cliente e da agência, com previstas × publicadas.
+- **Semáforo**: vermelho = passou da data e não saiu; amarelo = perto da data e não está pronta.
+- **Fila de produção** (vídeos) por etapa, ordenada pela data de publicação, com
+  **distribuição automática** para quem está com menos coisa.
+- **Link de aprovação** exclusivo por cliente (`aprovar.html`): o cliente aprova ou pede ajuste
+  sem login; aprovado vai para agendamento, ajuste volta para edição com o comentário.
+- **Materiais pedidos ao cliente**, com cobrança pelo WhatsApp (manual ou automática).
+- **Monitor de tráfego**: confere as contas sozinho e lista só as exceções, comparando com as
+  metas de cada cliente (orçamento/dia, custo máximo, resultados/dia).
+- **Relatório mensal** por cliente (postagens, entregas e Meta) em PDF.
+- **Checklist de cliente novo**: ao cadastrar, as tarefas de entrada são criadas sozinhas.
+- **Cadastro completo**: serviços, contrato, briefing, links, responsáveis.
+- **“Bom dia” no WhatsApp** de cada pessoa com o que ela tem no dia.
 
 ---
 
@@ -37,7 +58,12 @@ Funciona no computador e no celular, instalável como aplicativo.
 | Arquivo | Para que serve |
 |---|---|
 | `index.html` | o site inteiro |
+| `config.js` | endereço e chave do Supabase (vale para o site e para a página de aprovação) |
+| `aprovar.html` | página que o cliente abre para aprovar |
 | `supabase/migrations/20261102000000_cometa_v2.sql` | estrutura do banco e permissões (e migra dados do Cometa OS antigo, se existirem) |
+| `supabase/migrations/20261102010000_producao.sql` | postagens, materiais, alertas, campos novos do cliente |
+| `supabase/functions/aprovacao` | o link de aprovação do cliente |
+| `supabase/functions/rotinas` | o que roda sozinho (monitor, bom dia, materiais, publicações) |
 | `supabase/functions/cometinha` | o Cometinha dentro do CRM |
 | `supabase/functions/meta` | aba de anúncios (a chave da Meta fica só no servidor) |
 | `supabase/functions/whatsapp` | o Cometinha no WhatsApp (Evolution) |
@@ -51,7 +77,8 @@ Funciona no computador e no celular, instalável como aplicativo.
 ### 1. Supabase
 1. Crie um projeto em <https://supabase.com> (região São Paulo).
 2. **SQL Editor › New query** › cole todo o arquivo
-   `supabase/migrations/20261102000000_cometa_v2.sql` › **Run**.
+   `supabase/migrations/20261102000000_cometa_v2.sql` › **Run**. Depois faça o mesmo com
+   `supabase/migrations/20261102010000_producao.sql`.
 3. **Authentication › Users › Add user**: crie o primeiro acesso (marque
    *Auto Confirm User*). Depois, no SQL Editor, transforme-o em administrador:
    ```sql
@@ -59,7 +86,7 @@ Funciona no computador e no celular, instalável como aplicativo.
    select id, 'Seu Nome', email, 'admin', true from auth.users where email = 'seu@email.com';
    ```
 4. **Project Settings › API**: copie a *Project URL* e a chave *anon/publishable*
-   e cole no começo do `index.html` (`SUPABASE_URL` e `SUPABASE_KEY`).
+   e cole no arquivo `config.js` (`SUPABASE_URL` e `SUPABASE_KEY`).
 
 ### 2. Chaves do servidor
 Supabase › **Edge Functions › Secrets** (ou `npx supabase secrets set NOME=valor`):
@@ -76,20 +103,45 @@ Supabase › **Edge Functions › Secrets** (ou `npx supabase secrets set NOME=v
 | `EVO_KEY` | apikey da Evolution | WhatsApp |
 | `EVO_INSTANCIA` | nome da instância do chip do Cometinha | WhatsApp |
 | `EVO_SEGREDO` | uma senha longa que você inventa (vai no endereço do webhook) | WhatsApp |
+| `ROTINAS_SEGREDO` | outra senha longa que você inventa (o agendador usa) | rotinas automáticas |
 
 ### 3. Subir as funções
 ```bash
 npx supabase login
 npx supabase link --project-ref SEU-PROJETO
-npx supabase functions deploy cometinha meta whatsapp --use-api
+npx supabase functions deploy cometinha meta whatsapp aprovacao rotinas --use-api
 ```
+
+### 3b. Ligar as rotinas automáticas
+**Database › Extensions**: ligue `pg_cron` e `pg_net`. Depois, no **SQL Editor**, troque
+`SEU-PROJETO` e `SEU-SEGREDO` (o mesmo `ROTINAS_SEGREDO`) e rode:
+
+```sql
+-- horários em UTC (Brasília = UTC-3)
+select cron.schedule('cometa-monitor', '0 10,14,18,22 * * *', $$select net.http_post(
+  url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=monitor',
+  headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- 7h, 11h, 15h, 19h
+select cron.schedule('cometa-bom-dia', '0 11 * * 1-6', $$select net.http_post(
+  url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=bom_dia',
+  headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- 8h, seg a sáb
+select cron.schedule('cometa-publicacoes', '30 * * * *', $$select net.http_post(
+  url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=publicacoes',
+  headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- de hora em hora
+select cron.schedule('cometa-materiais', '0 13 * * 1-5', $$select net.http_post(
+  url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=materiais',
+  headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- 10h, seg a sex
+```
+
+O lembrete de materiais só manda mensagem ao cliente se estiver ligado em **Ajustes**.
+O “bom dia” e o aviso de anúncios usam o chip do Cometinha (Evolution).
 
 ### 4. Publicar o site
 GitHub › **Settings › Pages › Deploy from a branch › main / (root)**.
 
 ### 5. Equipe
 Em **Equipe**, crie os acessos e marque as permissões: *Ver anúncios*,
-*Pausar/ativar/mudar orçamento*, *Usar o Cometinha*. Preencha o **WhatsApp**
+*Pausar/ativar/mudar orçamento*, *Usar o Cometinha*, *Criar e editar postagens*,
+*Avançar etapas* (para quem grava/edita), *Pedir e marcar materiais*. Preencha o **WhatsApp**
 de quem vai falar com o Cometinha pelo celular.
 
 ---

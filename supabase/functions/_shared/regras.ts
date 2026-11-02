@@ -18,6 +18,7 @@ export const PERMISSOES = [
   'ver_geral', 'ver_clientes', 'ver_agenda', 'ver_compromissos', 'criar_compromisso',
   'lancar', 'concluir', 'excluir_atividade', 'editar_clientes', 'ver_financeiro',
   'editar_financeiro', 'ajustes', 'meta_ver', 'meta_editar', 'cometinha',
+  'postagens_editar', 'postagens_mover', 'materiais',
 ] as const;
 
 export const pode = (p: Perfil, k: string) =>

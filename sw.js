@@ -1,6 +1,6 @@
 /* cache simples: abre offline com a última versão baixada */
-const CACHE = 'cometa-os-v2';
-const ARQUIVOS = ['./', './index.html', './manifest.webmanifest', './icone.svg'];
+const CACHE = 'cometa-crm-v3';
+const ARQUIVOS = ['./', './index.html', './config.js', './manifest.webmanifest', './icone.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
