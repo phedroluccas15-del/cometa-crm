@@ -9,7 +9,7 @@ export const SCRIPT_NAVEGADOR = `
   const rodar = spec => window.__sb(JSON.stringify(spec)).then(r => JSON.parse(r));
   class Q {
     constructor(t){ this.s = { t, op: 'select', filtros: [], ordem: [], }; }
-    select(){ if (this.s.op === 'select') this.s.op = 'select'; return this; }
+    select(){ if (this.s.op !== 'select') this.s.retornar = true; return this; }
     insert(rows){ this.s.op = 'insert'; this.s.rows = [].concat(rows); return this; }
     upsert(rows){ this.s.op = 'upsert'; this.s.rows = [].concat(rows); return this; }
     update(v){ this.s.op = 'update'; this.s.valores = v; return this; }
@@ -77,7 +77,8 @@ async function rodar(db, uid, s) {
         (resto.length ? 'update set ' + resto.map(c => `${id(c)} = excluded.${id(c)}`).join(', ') : 'nothing');
     }
   } else if (s.op === 'update') {
-    sql = `update public.${id(s.t)} set ` + Object.entries(s.valores).map(([c, v]) => `${id(c)} = ${val(v)}`).join(', ') + onde();
+    sql = `update public.${id(s.t)} set ` + Object.entries(s.valores).map(([c, v]) => `${id(c)} = ${val(v)}`).join(', ') + onde()
+      + (s.retornar ? ' returning *' : '');
   } else if (s.op === 'delete') {
     sql = `delete from public.${id(s.t)}` + onde();
   }

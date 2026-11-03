@@ -1,11 +1,12 @@
 // Rotinas automáticas. Quem chama é o agendador do Supabase (pg_cron), com o segredo:
 //   POST https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=monitor
 //   cabeçalho  x-segredo: ROTINAS_SEGREDO
-// tarefa = monitor | bom_dia | materiais | publicacoes
+// tarefa = publicar | monitor | bom_dia | materiais | publicacoes
 // (o agendamento pronto para colar está no LEIA-ME.md)
 // Precisa de verify_jwt = false (ver supabase/config.toml).
 
-import { enviarPelaEvolution, env, json, metaCfg, q } from '../_shared/servidor.ts';
+import { assinarArquivo, enviarPelaEvolution, env, json, metaCfg, q } from '../_shared/servidor.ts';
+import { publicarPendentes } from '../_shared/publicar.ts';
 import { iguais } from '../_shared/whatsapp.ts';
 import { bomDia, cobrarMateriais, conferirPublicacoes, monitor, type Deps } from '../_shared/rotinas.ts';
 
@@ -15,6 +16,7 @@ Deno.serve(async req => {
   const tarefa = new URL(req.url).searchParams.get('tarefa') || '';
   const d: Deps = { q, agora: new Date(), meta: metaCfg(), enviar: enviarPelaEvolution() };
   try {
+    if (tarefa === 'publicar') return json(await publicarPendentes({ ...d, assinar: c => assinarArquivo(c, 60 * 60 * 24 * 7) }));
     if (tarefa === 'monitor') return json(await monitor(d));
     if (tarefa === 'bom_dia') return json(await bomDia(d));
     if (tarefa === 'materiais') return json(await cobrarMateriais(d));

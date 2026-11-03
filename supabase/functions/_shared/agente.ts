@@ -32,12 +32,13 @@ async function carregar(q: Consulta, conversaId: string): Promise<Item[]> {
   return r.map((m: any) => (typeof m.content === 'string' ? JSON.parse(m.content) : m.content));
 }
 
-async function salvar(q: Consulta, conversaId: string, itens: Item[]) {
+async function salvar(q: Consulta, conversaId: string, itens: Item[], agora: Date) {
   for (const i of itens) {
     await q(`insert into public.cometinha_mensagens (conversa_id, role, content) values ($1, $2, $3::jsonb)`,
       [conversaId, papel(i), JSON.stringify(i)]);
   }
-  await q(`update public.cometinha_conversas set atualizado_em = now() where id = $1`, [conversaId]);
+  // mesmo relógio da conversa (agora), para "conversa nova no dia seguinte" bater certo
+  await q(`update public.cometinha_conversas set atualizado_em = $2 where id = $1`, [conversaId, agora.toISOString()]);
 }
 
 /** só o que vale guardar para as próximas mensagens (o raciocínio interno fica de fora) */
@@ -73,7 +74,8 @@ export async function conversaAtual(q: Consulta, usuarioId: string, canal: strin
       }
     }
   }
-  const [nova] = await q(`insert into public.cometinha_conversas (usuario_id, canal) values ($1, $2) returning id`, [usuarioId, canal]);
+  const [nova] = await q(`insert into public.cometinha_conversas (usuario_id, canal, criado_em, atualizado_em)
+      values ($1, $2, $3, $3) returning id`, [usuarioId, canal, agora.toISOString()]);
   return { id: nova.id as string, historico: [] as Item[] };
 }
 
@@ -115,7 +117,7 @@ export async function conversar(p: Pedido) {
     ` (${ctx.perfil.papel === 'admin' ? 'administrador' : 'operador'}) · canal: ${p.canal === 'whatsapp' ? 'WhatsApp' : 'CRM'}` +
     `${p.origem ? ' · ' + p.origem : ''}]`;
   const pergunta: Item = { role: 'user', content: `${cabecalho}\n${p.texto}` };
-  await salvar(ctx.q, conv.id, [pergunta]);
+  await salvar(ctx.q, conv.id, [pergunta], ctx.agora);
 
   const entrada: Item[] = [...conv.historico, pergunta];
   ctx.confirmaveis = confirmaveis(entrada);
@@ -145,7 +147,7 @@ export async function conversar(p: Pedido) {
     if (!chamadas.length) {
       resposta = saida.filter(i => i.type === 'message').map(textoDe).join('\n\n').trim();
       if (!resposta) guardar.push({ role: 'assistant', content: 'Pronto.' });
-      await salvar(ctx.q, conv.id, guardar);
+      await salvar(ctx.q, conv.id, guardar, ctx.agora);
       break;
     }
 
@@ -159,7 +161,7 @@ export async function conversar(p: Pedido) {
       return { type: 'function_call_output', call_id: c.call_id, output: r.texto };
     }));
     entrada.push(...resultados);
-    await salvar(ctx.q, conv.id, [...guardar, ...resultados]);
+    await salvar(ctx.q, conv.id, [...guardar, ...resultados], ctx.agora);
   }
 
   return { conversaId: conv.id, resposta: resposta || 'Pronto.', acoes };

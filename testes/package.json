@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "dia": "node dia-a-dia.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.3.16",

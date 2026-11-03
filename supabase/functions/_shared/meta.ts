@@ -252,6 +252,77 @@ export async function publicacoes(cfg: MetaCfg, paginaId: string, limite = 6) {
   };
 }
 
+// ---------- publicação (Instagram e Facebook) ----------
+// O Instagram não tem agendamento pela API: o nosso servidor publica na hora marcada.
+// Vídeo/Reels: a Meta baixa e processa o arquivo; por isso é em duas fases
+// (cria o "container", e numa próxima rodada, quando estiver pronto, publica).
+
+export type TipoPub = 'imagem' | 'carrossel' | 'reels' | 'stories';
+export const ehVideoUrl = (u: string) => /\.(mp4|mov|m4v)(\?|$)/i.test(u.split('#')[0]);
+
+/** conta do Instagram ligada à página e a chave da página (necessária para publicar) */
+export async function acessoPagina(cfg: MetaCfg, paginaId: string) {
+  const p = await graph(cfg, paginaId, { fields: 'name,access_token,instagram_business_account{id,username}' });
+  if (!p.access_token) throw new MetaErro('A chave da Meta não tem acesso de publicação a esta página (falta pages_manage_posts).');
+  return { igId: p.instagram_business_account?.id as string | undefined, usuario: p.instagram_business_account?.username,
+    pageToken: p.access_token as string, nome: p.name as string };
+}
+
+/** cria o container no Instagram; devolve o id (para conferir e publicar depois) */
+export async function criarContainerIG(cfg: MetaCfg, igId: string, tipo: TipoPub, urls: string[], legenda: string) {
+  if (!urls.length) throw new MetaErro('Falta o arquivo (imagem ou vídeo) para publicar.');
+  const um = (u: string, extra: Record<string, string> = {}) => ehVideoUrl(u)
+    ? { media_type: extra.media_type || 'REELS', video_url: u, ...extra }
+    : { image_url: u, ...extra };
+  if (tipo === 'carrossel') {
+    if (urls.length < 2 || urls.length > 10) throw new MetaErro('Carrossel precisa de 2 a 10 arquivos.');
+    const filhos: string[] = [];
+    for (const u of urls) {
+      const p: Record<string, string> = ehVideoUrl(u) ? { media_type: 'VIDEO', video_url: u, is_carousel_item: 'true' } : { image_url: u, is_carousel_item: 'true' };
+      filhos.push((await graph(cfg, `${igId}/media`, p, 'POST')).id);
+    }
+    return (await graph(cfg, `${igId}/media`, { media_type: 'CAROUSEL', children: filhos.join(','), caption: legenda }, 'POST')).id as string;
+  }
+  if (tipo === 'stories') return (await graph(cfg, `${igId}/media`, um(urls[0], { media_type: 'STORIES' }), 'POST')).id as string;
+  const params = tipo === 'reels' || ehVideoUrl(urls[0]) ? { media_type: 'REELS', video_url: urls[0], caption: legenda } : { image_url: urls[0], caption: legenda };
+  return (await graph(cfg, `${igId}/media`, params, 'POST')).id as string;
+}
+
+/** FINISHED = pronto; IN_PROGRESS = ainda processando; ERROR/EXPIRED = falhou */
+export async function statusContainer(cfg: MetaCfg, id: string) {
+  const r = await graph(cfg, id, { fields: 'status_code,status' });
+  return { codigo: String(r.status_code || 'FINISHED'), detalhe: r.status || '' };
+}
+
+export async function publicarContainerIG(cfg: MetaCfg, igId: string, containerId: string) {
+  const r = await graph(cfg, `${igId}/media_publish`, { creation_id: containerId }, 'POST');
+  let link: string | null = null;
+  try { link = (await graph(cfg, r.id, { fields: 'permalink' })).permalink || null; } catch { /* sem link, mas publicou */ }
+  return { id: r.id as string, link };
+}
+
+/** Facebook: publica direto na página (foto, várias fotos ou vídeo) */
+export async function publicarFB(cfg: MetaCfg, paginaId: string, tipo: TipoPub, urls: string[], legenda: string) {
+  if (!urls.length) throw new MetaErro('Falta o arquivo para publicar no Facebook.');
+  if (tipo === 'stories') throw new MetaErro('Stories só é publicado no Instagram.');
+  let id: string;
+  if (ehVideoUrl(urls[0])) {
+    id = (await graph(cfg, `${paginaId}/videos`, { file_url: urls[0], description: legenda }, 'POST')).id;
+  } else if (urls.length > 1) {
+    const fotos: string[] = [];
+    for (const u of urls.filter(u => !ehVideoUrl(u))) fotos.push((await graph(cfg, `${paginaId}/photos`, { url: u, published: 'false' }, 'POST')).id);
+    const p: Record<string, string> = { message: legenda };
+    fotos.forEach((f, i) => { p[`attached_media[${i}]`] = JSON.stringify({ media_fbid: f }); });
+    id = (await graph(cfg, `${paginaId}/feed`, p, 'POST')).id;
+  } else {
+    const r = await graph(cfg, `${paginaId}/photos`, { url: urls[0], caption: legenda }, 'POST');
+    id = r.post_id || r.id;
+  }
+  let link: string | null = null;
+  try { link = (await graph(cfg, id, { fields: 'permalink_url' })).permalink_url || null; } catch { /* ok */ }
+  return { id, link: link || `https://facebook.com/${id}` };
+}
+
 // ---------- edição ----------
 export type Alteracao = { status?: 'ACTIVE' | 'PAUSED'; orcamentoDiario?: number; nome?: string };
 

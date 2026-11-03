@@ -37,6 +37,10 @@ Funciona no computador e no celular, instalável como aplicativo.
   cliente → agendamento → publicado). O prazo de cada etapa conta para trás a partir da data de
   publicação; se uma etapa atrasa, as próximas são reorganizadas. Etapas, prazos e quem faz
   cada uma se mudam em **Ajustes**.
+- **Publicação automática** no Instagram e no Facebook: o post em *Agendamento* com
+  “Publicar sozinho” ligado sai no dia e hora marcados (imagem, carrossel, Reels/vídeo e
+  Stories). Se der erro, avisa o responsável no WhatsApp e aparece na Central. Tem também o
+  botão **Publicar agora**. Nunca publica o mesmo post duas vezes.
 - **Calendário** de cada cliente e da agência, com previstas × publicadas.
 - **Semáforo**: vermelho = passou da data e não saiu; amarelo = perto da data e não está pronta.
 - **Fila de produção** (vídeos) por etapa, ordenada pela data de publicação, com
@@ -78,7 +82,8 @@ Funciona no computador e no celular, instalável como aplicativo.
 1. Crie um projeto em <https://supabase.com> (região São Paulo).
 2. **SQL Editor › New query** › cole todo o arquivo
    `supabase/migrations/20261102000000_cometa_v2.sql` › **Run**. Depois faça o mesmo com
-   `supabase/migrations/20261102010000_producao.sql`.
+   `supabase/migrations/20261102010000_producao.sql` e
+   `supabase/migrations/20261103000000_publicacao.sql`, nessa ordem.
 3. **Authentication › Users › Add user**: crie o primeiro acesso (marque
    *Auto Confirm User*). Depois, no SQL Editor, transforme-o em administrador:
    ```sql
@@ -118,6 +123,9 @@ npx supabase functions deploy cometinha meta whatsapp aprovacao rotinas --use-ap
 
 ```sql
 -- horários em UTC (Brasília = UTC-3)
+select cron.schedule('cometa-publicar', '*/5 * * * *', $$select net.http_post(
+  url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=publicar',
+  headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- a cada 5 min: publica o que chegou na hora
 select cron.schedule('cometa-monitor', '0 10,14,18,22 * * *', $$select net.http_post(
   url := 'https://SEU-PROJETO.supabase.co/functions/v1/rotinas?tarefa=monitor',
   headers := '{"x-segredo":"SEU-SEGREDO"}'::jsonb, body := '{}'::jsonb)$$);   -- 7h, 11h, 15h, 19h
@@ -154,7 +162,9 @@ No Gerenciador de Negócios da agência (business.facebook.com):
 2. **Atribuir ativos**: contas de anúncio e páginas dos clientes (as que a agência
    acessa como parceira), com controle total.
 3. **Gerar token** (validade: nunca expira) com: `ads_read`, `ads_management`,
-   `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `business_management`.
+   `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `business_management`
+   e, para **publicar sozinho**: `pages_manage_posts` e `instagram_content_publish`.
+   Ao atribuir as páginas ao usuário do sistema, marque a permissão de **criar conteúdo**.
 4. Coloque em `META_TOKEN`.
 
 Depois, em cada cliente: **ficha › Anúncios · Meta › Ligar conta da Meta**.
@@ -177,10 +187,24 @@ Mandar `/nova` começa uma conversa do zero.
 
 ---
 
+## Publicação automática: o que saber
+- O arquivo precisa ser **enviado pelo CRM** (botão “enviar arquivos”) ou ser um link direto
+  de imagem/vídeo (`.jpg`, `.mp4`). Link do Drive/WeTransfer serve para o cliente aprovar,
+  mas a Meta não consegue baixar dele para publicar.
+- Imagem em PNG é convertida para JPEG sozinha (o Instagram só aceita JPEG).
+- No plano grátis do Supabase cada arquivo pode ter até **50 MB**. Vídeo maior: plano Pro
+  (Storage › Settings › limite por arquivo) ou um link direto de outro lugar.
+- Carrossel: de 2 a 10 arquivos, na ordem da lista. Stories: só Instagram.
+- Reels/vídeo: a Meta processa o arquivo; o post sai em alguns minutos depois do horário.
+- O Instagram limita a 50 publicações por dia por conta (pela API).
+
 ## Testar sem servidor
 - Sem `SUPABASE_URL`, o site roda em **modo demonstração**.
 - Com Supabase configurado, `?local=1` no fim do endereço força o modo
   demonstração (não toca no banco).
+- No modo demonstração a publicação automática é **simulada** (não posta de verdade).
+- Testes: `cd testes && npm install && npm test`. Roteiro de uso do dia a dia num
+  navegador, com as permissões de verdade: `NUVEM=1 npm run dia`.
 
 ## Cópia de segurança
 **Ajustes › Baixar backup** gera um `.json` com tudo. **Restaurar backup** faz o

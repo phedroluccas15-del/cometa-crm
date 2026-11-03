@@ -73,6 +73,19 @@ export function enviarPelaEvolution() {
   return (numero: string, texto: string) => responder({ url, chave, instancia }, numero.replace(/\D/g, ''), texto);
 }
 
+/** link público temporário de um arquivo da pasta "arquivos" do Storage (a Meta baixa por ele) */
+export async function assinarArquivo(caminho: string, segundos = 60 * 60 * 48): Promise<string | null> {
+  const base = env('SUPABASE_URL');
+  const r = await fetch(`${base}/storage/v1/object/sign/arquivos/${caminho.split('/').map(encodeURIComponent).join('/')}`, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + env('SUPABASE_SERVICE_ROLE_KEY'), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ expiresIn: segundos }),
+  });
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j.signedURL ? base + '/storage/v1' + j.signedURL : null;
+}
+
 /** envolve a função com CORS e transforma erros em resposta legível */
 export function servir(fn: (req: Request) => Promise<Response>) {
   Deno.serve(async req => {

@@ -9,9 +9,11 @@
 //   apagar_chave { clienteId }                      (admin)
 //   info_chave   { clienteId }                      (admin: só diz se existe e quando vence)
 //   monitorar                                       → roda o monitor de anúncios agora (botão "verificar agora")
+//   publicar     { postagemId }                     → publica agora no Instagram/Facebook (botão "Publicar agora")
 //   rotina       { tarefa }                         (admin: roda bom_dia, materiais ou publicacoes na hora)
 
-import { autenticar, enviarPelaEvolution, ErroHttp, json, metaCfg, q, servir } from '../_shared/servidor.ts';
+import { assinarArquivo, autenticar, enviarPelaEvolution, ErroHttp, json, metaCfg, q, servir } from '../_shared/servidor.ts';
+import { publicarAgora } from '../_shared/publicar.ts';
 import { bomDia, cobrarMateriais, conferirPublicacoes, monitor } from '../_shared/rotinas.ts';
 import * as meta from '../_shared/meta.ts';
 import { pode, type Perfil } from '../_shared/regras.ts';
@@ -97,6 +99,14 @@ servir(async req => {
         if (perfil.papel !== 'admin') throw new ErroHttp(403, 'Só administrador.');
         const [t] = await q(`select expira_em::text, criado_em from privado.meta_tokens where cliente_id = $1`, [b.clienteId]);
         return json({ propria: !!t, expiraEm: t?.expira_em || null, padraoConfigurado: !!base.tokenPadrao });
+      }
+      case 'publicar': {
+        if (!pode(perfil, 'postagens_mover') && !pode(perfil, 'postagens_editar')) throw new ErroHttp(403, 'Sem permissão para publicar.');
+        const r = await publicarAgora({ q, agora: new Date(), meta: base, enviar: enviarPelaEvolution(),
+          assinar: c => assinarArquivo(c, 60 * 60 * 24 * 7) }, String(b.postagemId))
+          .catch(e => { throw new ErroHttp(400, (e as Error).message); });
+        await q(`insert into public.historico (quem, acao, detalhe) values ($1, 'Mandou publicar agora', $2)`, [perfil.nome, String(b.postagemId)]);
+        return json(r);
       }
       case 'monitorar': {
         exigir(perfil, 'meta_ver');

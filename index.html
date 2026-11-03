@@ -271,6 +271,10 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
   .ct{left:8px;right:8px;width:auto;max-width:none;top:10px;bottom:calc(78px + env(safe-area-inset-bottom));height:auto}
 }
 
+/* ===== publicação automática ===== */
+.caixa-pub{border:1px solid var(--linha);border-radius:12px;padding:10px 12px;margin-bottom:13px;background:#F8F9FD}
+.pub-info{font-size:13px;color:var(--cometa);margin-top:6px}
+.pub-ok{font-size:13.5px;color:var(--ok);font-weight:600;margin-top:6px}
 /* ===== produção, semáforo, calendário, kanban ===== */
 .perigo-forte{background:#FDECEC!important;color:var(--atraso)!important;border-color:#F3C6C7!important}
 .sem-resumo{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--suave);margin-bottom:10px}
@@ -343,6 +347,7 @@ h1,h2,h3{font-family:'Bricolage Grotesque',sans-serif;letter-spacing:-.025em;mar
       <div class="grade kpis" id="kpis2" style="margin-top:12px"></div>
       <div class="rotulo">Semáforo dos clientes</div><div id="semaforo"></div>
       <div class="rotulo">Postagens atrasadas</div><div id="bl-post-atraso"></div>
+      <div id="caixa-pub-erro"><div class="rotulo">Falhas na publicação automática</div><div id="bl-pub-erro"></div></div>
       <div class="rotulo">Publicar hoje</div><div id="bl-post-hoje"></div>
       <div class="rotulo">Esperando aprovação do cliente</div><div id="bl-post-aprov"></div>
       <div class="rotulo">Prazos de etapa vencendo (hoje e amanhã)</div><div id="bl-prazos"></div>
@@ -702,14 +707,18 @@ const TABELAS={
       hora:r.hora||'',prioridade:r.prioridade||'normal',responsavel:r.responsavel||'',captador:r.captador||'',editor:r.editor||'',
       revisor:r.revisor||'',dataGravacao:r.data_gravacao||null,roteiro:r.roteiro||'',legenda:r.legenda||'',arquivo:r.arquivo||'',
       link:r.link_publicado||'',obs:r.obs||'',aprovacao:r.aprovacao||null,aprovacaoComentario:r.aprovacao_comentario||'',
-      eventos:Array.isArray(r.eventos)?r.eventos:[],etapaDesde:ms(r.etapa_desde),publicadoEm:ms(r.publicado_em),criadoEm:ms(r.criado_em)}),
+      eventos:Array.isArray(r.eventos)?r.eventos:[],etapaDesde:ms(r.etapa_desde),publicadoEm:ms(r.publicado_em),criadoEm:ms(r.criado_em),
+      publicarAuto:!!r.publicar_auto,destinos:Array.isArray(r.destinos)&&r.destinos.length?r.destinos:['instagram'],
+      midias:Array.isArray(r.midias)?r.midias:[],pubStatus:r.pub_status||null,pubErro:r.pub_erro||'',pubTentativas:r.pub_tentativas||0}),
     para:p=>({id:p.id,cliente_id:p.clienteId,titulo:p.titulo,formato:p.formato||'feed',etapa:p.etapa||'pauta',
       data_publicacao:vazioNulo(p.data),hora:vazioNulo(p.hora),prioridade:p.prioridade||'normal',responsavel:vazioNulo(p.responsavel),
       captador:vazioNulo(p.captador),editor:vazioNulo(p.editor),revisor:vazioNulo(p.revisor),data_gravacao:vazioNulo(p.dataGravacao),
       roteiro:vazioNulo(p.roteiro),legenda:vazioNulo(p.legenda),arquivo:vazioNulo(p.arquivo),link_publicado:vazioNulo(p.link),
       obs:vazioNulo(p.obs),aprovacao:vazioNulo(p.aprovacao),aprovacao_comentario:vazioNulo(p.aprovacaoComentario),
       eventos:p.eventos||[],etapa_desde:isoTs(p.etapaDesde||p.criadoEm||Date.now()),publicado_em:isoTs(p.publicadoEm),
-      criado_em:isoTs(p.criadoEm||Date.now())})},
+      criado_em:isoTs(p.criadoEm||Date.now()),
+      /* pub_status/pub_erro são do servidor: o site não grava (só zera no "tentar de novo") */
+      publicar_auto:!!p.publicarAuto,destinos:p.destinos&&p.destinos.length?p.destinos:['instagram'],midias:p.midias||[]})},
   materiais:{tabela:'materiais',
     de:r=>({id:r.id,clienteId:r.cliente_id,descricao:r.descricao,prazo:r.prazo||null,pedidoEm:ms(r.pedido_em),
       recebidoEm:ms(r.recebido_em),ultimoLembrete:ms(r.ultimo_lembrete),lembretes:r.lembretes||0}),
@@ -794,11 +803,23 @@ async function sincronizar(){
   try{
     /* 1. cria/atualiza (clientes antes, por causa dos vínculos) */
     for(const k of ORDEM_GRAVAR){
-      const T=TABELAS[k],mudou=[];
-      for(const o of dados[k]){const s=JSON.stringify(T.para(o));if(base[k].get(o.id)!==s)mudou.push([o.id,s])}
-      if(!mudou.length)continue;
-      const {error}=await sb.from(T.tabela).upsert(mudou.map(([,s])=>JSON.parse(s)));
-      if(error)erros.push(error);else mudou.forEach(([id,s])=>base[k].set(id,s));
+      const T=TABELAS[k],novos=[],editados=[];
+      for(const o of dados[k]){const s=JSON.stringify(T.para(o));const b=base[k].get(o.id);
+        if(b===undefined)novos.push([o.id,s]);else if(b!==s)editados.push([o.id,s,b])}
+      /* novo = insert; já existente = update só do que mudou
+         (upsert exigiria permissão de criar até para quem só conclui ou avança etapa) */
+      if(novos.length){
+        const {error}=await sb.from(T.tabela).upsert(novos.map(([,s])=>JSON.parse(s)));
+        if(error)erros.push(error);else novos.forEach(([id,s])=>base[k].set(id,s));
+      }
+      for(const [id,s,b] of editados){
+        const n=JSON.parse(s),v=JSON.parse(b),dif={};
+        for(const c in n)if(JSON.stringify(n[c])!==JSON.stringify(v[c]))dif[c]=n[c];
+        const {data,error}=await sb.from(T.tabela).update(dif).eq('id',id).select('id');
+        /* sem erro mas nada alterado = o banco não deixou (permissão) ou o registro sumiu */
+        if(!error&&!(data||[]).length)erros.push({code:'42501',message:'nenhuma linha alterada'});
+        else if(error)erros.push(error);else base[k].set(id,s);
+      }
     }
     /* 2. apaga o que saiu (ordem inversa) */
     for(const k of [...ORDEM_GRAVAR].reverse()){
@@ -825,7 +846,8 @@ async function sincronizar(){
     /* 4. ajustes (equipe, serviços, etapas, checklist, regras) */
     const aj=JSON.stringify(AJ());
     if(aj!==base.ajustes){
-      const {error}=await sb.from('ajustes').update(AJ()).eq('id','principal');
+      const {data,error:e0}=await sb.from('ajustes').update(AJ()).eq('id','principal').select('id');
+      const error=e0||(!(data||[]).length?{code:'42501',message:'nenhuma linha alterada'}:null);
       if(error)erros.push(error);else base.ajustes=aj;
     }
     /* 5. histórico */
@@ -866,8 +888,9 @@ function aplicarRemoto(k,p){
       dados[k]=dados[k].filter(o=>o.id!==id);base[k].delete(id);
     }else{
       const o=T.de(p.new),s=JSON.stringify(T.para(o));
-      if(base[k].get(o.id)===s)return; /* é o que eu mesmo salvei */
       const i=dados[k].findIndex(x=>x.id===o.id);
+      /* é o que eu mesmo salvei (mas o servidor pode ter mudado o status da publicação) */
+      if(base[k].get(o.id)===s&&!(k==='postagens'&&i>=0&&(dados[k][i].pubStatus!==o.pubStatus||dados[k][i].pubErro!==o.pubErro)))return;
       if(i>=0)dados[k][i]=o;else dados[k].push(o);
       base[k].set(o.id,s);
     }
@@ -1162,7 +1185,7 @@ function pintarGeral(){
   const k=(rot,num,pe,cls)=>`<div class="kpi ${cls||''}"><div class="rot">${rot}</div><div class="num">${num}</div><div class="pe">${pe}</div></div>`;
   document.getElementById('kpis').innerHTML=
     k('Postagens atrasadas',pAtr.length,pAtr.length?'passou da data e não saiu':'nada atrasado',pAtr.length?'alerta':'')+
-    k('Publicar hoje',pHoje.length,pHoje.filter(p=>idxEt(p.etapa)<idxEt('agendamento')).length+' ainda não agendada(s)')+
+    k('Publicar hoje',pHoje.length,pHoje.filter(p=>p.publicarAuto&&p.etapa==='agendamento').length+' sai(em) sozinho(s)')+
     k('Em risco',pRisco.length,'próximos '+cfg().risco_dias+' dias',pRisco.length?'alerta':'')+
     k('Aprovações pendentes',pAprov.length,'esperando o cliente');
   document.getElementById('kpis2').innerHTML=
@@ -1180,6 +1203,9 @@ function pintarGeral(){
   pintarSemaforo('semaforo');
   blocoPosts(pAtr,'bl-post-atraso','<b>Nenhuma postagem atrasada</b>Tudo que tinha data já saiu.');
   blocoPosts(pHoje,'bl-post-hoje','<b>Nada para publicar hoje</b>');
+  const pErro=pa.filter(p=>p.pubStatus==='erro');
+  esconder('caixa-pub-erro',pErro.length>0);
+  blocoPosts(pErro,'bl-pub-erro','');
   blocoPosts(pAprov,'bl-post-aprov','<b>Nada esperando o cliente</b>');
   blocoPosts(prazos,'bl-prazos','<b>Nenhum prazo de etapa vencendo</b>');
   const bm=document.getElementById('bl-materiais');
@@ -1338,6 +1364,7 @@ async function demoFuncao(nome,b){
         dados.alertas.unshift({id:uid(),clienteId:c.id,tipo:'cpl_alto',gravidade:'media',campanha:'',texto:'Exemplo: custo por conversa em 7 dias está R$ 9,80 (meta: até R$ 7,00).',criadoEm:Date.now(),resolvidoEm:null});novos=1}
       return {verificados:dados.clientes.filter(x=>x.metaContaId).length,novos,erros:[]};
     }
+    if(b.acao==='publicar'){const p=dados.postagens.find(x=>x.id===b.postagemId);const r=publicarDemo(p);localSet(dados);return {resultado:r,erro:p.pubErro}}
     if(b.acao==='rotina')return {enviados:0,marcados:0,motivo:'No modo demonstração nada é enviado.'};
     throw new Error('No modo demonstração isso não está disponível.');
   }
@@ -1543,7 +1570,7 @@ document.getElementById('b-zap').onclick=()=>{
     `✅ Entregue este mês (${f.length})\n`+(f.length?f.map(a=>`• ${a.titulo} — ${curta(a.feitaEm)}`).join('\n'):'• nada ainda')+
     `\n\n🔵 Em andamento (${p.length})\n`+(p.length?p.map(a=>`• ${a.titulo}${a.data?' — '+selo(a.data).txt:''}`).join('\n'):'• nada em aberto')+
     (()=>{const ps=postsAbertos().filter(x=>x.clienteId===clienteAberto&&x.data).sort((a,b)=>a.data.localeCompare(b.data)).slice(0,8);
-      return ps.length?`\n\n📅 Próximas postagens\n`+ps.map(x=>`• ${x.data.split('-').reverse().slice(0,2).join('/')} — ${x.titulo} (${etapaDe(x).nome.toLowerCase()})`).join('\n'):''})()+
+      return ps.length?`\n\n▸ Próximas postagens\n`+ps.map(x=>`• ${x.data.split('-').reverse().slice(0,2).join('/')} — ${x.titulo} (${etapaDe(x).nome.toLowerCase()})`).join('\n'):''})()+
     `\n\n— Cometa Digital`;
   const zap=(c.contato||'').replace(/\D/g,'');
   abrirModal(`<h3>Status para enviar</h3>
@@ -2187,6 +2214,7 @@ function cartaoPost(p,mostrarCliente){
         ${sp&&p.etapa!=='publicado'?`<span>prazo da etapa: ${sp.txt.toLowerCase()}</span>`:''}
         ${pz.reorg?'<span class="tag amanha">prazos reorganizados</span>':''}
         ${p.aprovacao==='ajustes'&&p.etapa!=='publicado'?'<span class="tag atraso">cliente pediu ajuste</span>':''}
+        ${tagPub(p)}
         ${p.prioridade==='alta'?'<span class="tag alta">prioridade</span>':''}
       </div>
     </div>
@@ -2270,10 +2298,20 @@ function formPostagem(p,novoCom){
     </div>
     <div class="campo"><label>Roteiro</label><textarea id="po-rot" ${dis}>${esc(p.roteiro||'')}</textarea></div>
     <div class="campo"><label>Legenda</label><textarea id="po-leg" ${dis}>${esc(p.legenda||'')}</textarea></div>
-    <div class="campo"><label>Arquivo final (link do Drive, WeTransfer…)</label>
-      <div style="display:flex;gap:6px"><input id="po-arq" value="${esc(String(p.arquivo||'').startsWith('storage:')?'(arquivo enviado pelo CRM)':p.arquivo||'')}" placeholder="https://…" ${mv?'':'disabled'}>
-      ${p.arquivo?'<button class="mini" id="po-ver">abrir</button>':''}
-      ${naNuvem&&mv?'<button class="mini" id="po-up">enviar</button><input type="file" id="po-file" hidden>':''}</div></div>
+    <div class="campo"><label>Arquivos do post (na ordem; carrossel = vários)</label>
+      <div id="po-midias"></div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        ${mv?`<input id="po-link-novo" placeholder="ou cole o link direto do arquivo (.jpg, .mp4)">
+        <button class="mini" id="po-add-link">+ link</button>
+        <button class="mini" id="po-up">enviar arquivos</button><input type="file" id="po-file" accept="image/*,video/mp4,video/quicktime" multiple hidden>`:''}
+      </div></div>
+    <div class="caixa-pub">
+      <label class="chk"><input type="checkbox" id="po-auto" ${p.publicarAuto?'checked':''} ${dis}> <span><b>Publicar sozinho</b> no dia e hora marcados (quando estiver em Agendamento)</span></label>
+      <div class="chips-servico" style="margin:4px 0 2px 26px">
+        <label><input type="checkbox" data-dest="instagram" ${(p.destinos||['instagram']).includes('instagram')?'checked':''} ${dis}> Instagram</label>
+        <label><input type="checkbox" data-dest="facebook" ${(p.destinos||[]).includes('facebook')?'checked':''} ${dis}> Facebook</label></div>
+      <div id="po-pub-status"></div>
+    </div>
     ${p.etapa==='publicado'||p.link?`<div class="campo"><label>Link da publicação</label><input id="po-link" value="${esc(p.link||'')}" ${mv?'':'disabled'}></div>`:''}
     <div class="campo"><label>Observação</label><textarea id="po-obs" ${dis}>${esc(p.obs||'')}</textarea></div>
     ${p.aprovacaoComentario?`<div class="meta-alerta" style="margin-bottom:12px"><b>Cliente:</b> ${esc(p.aprovacaoComentario)}</div>`:''}
@@ -2283,35 +2321,69 @@ function formPostagem(p,novoCom){
     <button class="btn sec" style="margin-top:8px" onclick="fecharModal()">Fechar</button>
     ${(p.eventos||[]).length?`<div class="eventos"><b>Histórico</b>${[...p.eventos].reverse().map(v=>`<div>${new Date(v.ts).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})} · ${esc(v.quem)} · ${esc(v.txt)}</div>`).join('')}</div>`:''}`);
   const $=id=>document.getElementById(id);
-  const arqOriginal=p.arquivo;
+  const midiasOriginais=JSON.stringify(p.midias||[]);
+  let midias=[...(p.midias&&p.midias.length?p.midias:(p.arquivo?[p.arquivo]:[]))];
+  const nomeMidia=m=>m.startsWith('storage:')?'📎 '+decodeURIComponent(m.split('/').pop().replace(/^\d+-/,'')):m.startsWith('demo:')?'📎 '+m.slice(5):'🔗 '+m;
+  const pintarMidias=()=>{
+    $('po-midias').innerHTML=midias.length?`<div class="painel">${midias.map((m,i)=>`<div class="item" style="padding:8px 11px">
+      <div class="corpo" style="font-size:13px;word-break:break-all">${i+1}. ${esc(nomeMidia(m))}</div>
+      ${m.startsWith('storage:')||/^https?:/.test(m)?`<button class="mini" data-m-ver="${i}">abrir</button>`:''}
+      ${mv&&i?`<button class="mini" data-m-sobe="${i}">↑</button>`:''}${mv?`<button class="mini perigo" data-m-tira="${i}">✕</button>`:''}</div>`).join('')}</div>`
+      :'<div class="nada" style="padding:12px;font-size:13px">Nenhum arquivo ainda.</div>';
+    $('po-midias').querySelectorAll('[data-m-ver]').forEach(b=>b.onclick=()=>abrirArquivo(midias[+b.dataset.mVer]));
+    $('po-midias').querySelectorAll('[data-m-sobe]').forEach(b=>b.onclick=()=>{const i=+b.dataset.mSobe;[midias[i-1],midias[i]]=[midias[i],midias[i-1]];pintarMidias()});
+    $('po-midias').querySelectorAll('[data-m-tira]').forEach(b=>b.onclick=()=>{midias.splice(+b.dataset.mTira,1);pintarMidias()});
+  };
+  pintarMidias();
+  pintarStatusPub(p,$('po-pub-status'));
   $('po-cli').onchange=e=>{if(!$('po-resp').value)$('po-resp').value=cliDe(e.target.value).respSocial||''};
-  if($('po-ver'))$('po-ver').onclick=()=>abrirArquivo(p.arquivo);
+  if($('po-add-link'))$('po-add-link').onclick=()=>{const v=$('po-link-novo').value.trim();if(!/^https?:\/\//.test(v))return aviso('Cole um link começando com https://');
+    if(/drive\.google|dropbox|wetransfer|onedrive/i.test(v))aviso('Link do Drive serve para o cliente ver, mas não para publicar sozinho. Para publicar, use "enviar arquivos".');
+    midias.push(v);$('po-link-novo').value='';pintarMidias()};
   if($('po-up')){
     $('po-up').onclick=()=>$('po-file').click();
     $('po-file').onchange=async e=>{
-      const f=e.target.files[0];if(!f)return;
-      if(f.size>500*1024*1024)return aviso('Arquivo acima de 500 MB. Use um link do Drive.');
-      $('po-up').textContent='enviando…';$('po-up').disabled=true;
-      const caminho=`${$('po-cli').value}/${p.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g,'_')}`;
-      const {error}=await sb.storage.from('arquivos').upload(caminho,f,{upsert:false});
-      $('po-up').disabled=false;$('po-up').textContent='enviar';
-      if(error)return aviso('Não deu para enviar: '+error.message);
-      p.arquivo='storage:'+caminho;$('po-arq').value='(arquivo enviado pelo CRM)';aviso('Arquivo enviado. Clique em Salvar.');
+      const fs=[...e.target.files];if(!fs.length)return;
+      if(!naNuvem){fs.forEach(f=>midias.push('demo:'+f.name));pintarMidias();return aviso('Modo demonstração: o arquivo não sobe de verdade, só o nome.')}
+      $('po-up').disabled=true;
+      for(const [n,f0] of fs.entries()){
+        $('po-up').textContent=`enviando ${n+1}/${fs.length}…`;
+        const f=await paraJpeg(f0);
+        if(f.size>50*1024*1024){aviso(f.name+': acima de 50 MB (limite do plano grátis do Supabase).');continue}
+        const caminho=`${$('po-cli').value}/${p.id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g,'_')}`;
+        const {error}=await sb.storage.from('arquivos').upload(caminho,f,{upsert:false,contentType:f.type||undefined});
+        if(error){aviso('Não deu para enviar '+f.name+': '+error.message);continue}
+        midias.push('storage:'+caminho);pintarMidias();
+      }
+      $('po-up').disabled=false;$('po-up').textContent='enviar arquivos';e.target.value='';
+      aviso('Arquivos enviados. Clique em Salvar.');
     };
   }
   $('po-salvar').onclick=async()=>{
     const tit=$('po-tit').value.trim();
     if(!tit)return aviso('Escreva o tema');
     const etapaNova=$('po-etapa').value,etapaVelha=novo?null:p.etapa;
-    const arqTela=$('po-arq').value.trim();
-    const arquivo=arqTela==='(arquivo enviado pelo CRM)'?p.arquivo:arqTela;
+    const auto=$('po-auto').checked,dest=[...document.querySelectorAll('[data-dest]')].filter(x=>x.checked).map(x=>x.dataset.dest);
+    if(ed&&auto){
+      const fmt=$('po-fmt').value;
+      if(!$('po-data').value||!$('po-hora').value)return aviso('Para publicar sozinho, preencha a data e o horário');
+      if(!dest.length)return aviso('Escolha Instagram e/ou Facebook');
+      if(!midias.length)return aviso('Para publicar sozinho, envie o arquivo do post');
+      if(midias.every(m=>/drive\.google|dropbox|wetransfer|onedrive/i.test(m)))return aviso('Link do Drive não serve para publicar sozinho: use "enviar arquivos"');
+      if(fmt==='carrossel'&&(midias.length<2||midias.length>10))return aviso('Carrossel precisa de 2 a 10 arquivos');
+      if(fmt==='stories'&&dest.includes('facebook'))return aviso('Stories só sai no Instagram: desmarque o Facebook');
+      if(!cliDe($('po-cli').value).metaPaginaId)aviso('Atenção: este cliente ainda não tem página ligada (ficha › Anúncios). Sem isso não publica.');
+    }
+    if(ed)Object.assign(p,{publicarAuto:auto,destinos:dest.length?dest:['instagram']});
+    p.midias=midias;
+    const arquivo=midias[0]||'';
     if(ed)Object.assign(p,{clienteId:$('po-cli').value,titulo:tit,formato:$('po-fmt').value,data:$('po-data').value||null,
       hora:$('po-hora').value||'',responsavel:$('po-resp').value,prioridade:$('po-prio').value,captador:$('po-capt').value,
       dataGravacao:$('po-grav').value||null,editor:$('po-edit').value,revisor:$('po-rev').value,roteiro:$('po-rot').value.trim(),
       legenda:$('po-leg').value.trim(),obs:$('po-obs').value.trim()});
     p.arquivo=arquivo;
     if($('po-link'))p.link=$('po-link').value.trim();
-    if(arquivo&&arquivo!==arqOriginal)p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:perfil.nome,txt:'Anexou o arquivo final'}];
+    if(JSON.stringify(midias)!==midiasOriginais&&midias.length)p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:perfil.nome,txt:'Atualizou os arquivos ('+midias.length+')'}];
     if(novo){
       p.eventos=[{ts:new Date().toISOString(),quem:perfil.nome,txt:'Criou a postagem'}];
       p.etapa=etapaNova;dados.postagens.push(p);
@@ -2325,7 +2397,7 @@ function formPostagem(p,novoCom){
     }
   };
   if($('po-dup'))$('po-dup').onclick=async()=>{
-    const c={...p,id:uid(),etapa:etapas()[0].k,link:'',arquivo:'',aprovacao:null,aprovacaoComentario:'',publicadoEm:null,
+    const c={...p,id:uid(),etapa:etapas()[0].k,link:'',arquivo:'',midias:[],pubStatus:null,pubErro:'',aprovacao:null,aprovacaoComentario:'',publicadoEm:null,
       eventos:[{ts:new Date().toISOString(),quem:perfil.nome,txt:'Duplicou de "'+p.titulo+'"'}],criadoEm:Date.now(),etapaDesde:Date.now(),
       data:p.data?somaDias(p.data,7):null};
     dados.postagens.push(c);registrar('Criou postagem',nomeCli(c.clienteId)+' — '+c.titulo+' (cópia)');
@@ -2339,6 +2411,75 @@ function formPostagem(p,novoCom){
     aviso('Postagem excluída',async()=>{dados.postagens.push(p);await gravar(dados);redesenhar()});
   };
 }
+/* ============ PUBLICAÇÃO AUTOMÁTICA ============ */
+const momentoPost=p=>new Date(`${p.data}T${/^\d{2}:\d{2}$/.test(p.hora||'')?p.hora:'09:00'}:00-03:00`);
+function tagPub(p){
+  if(p.etapa==='publicado')return '';
+  if(p.pubStatus==='erro')return '<span class="tag atraso" title="'+esc(p.pubErro)+'">⚠ erro ao publicar</span>';
+  if(p.pubStatus==='processando'||p.pubStatus==='publicando')return '<span class="tag hoje">publicando…</span>';
+  if(p.publicarAuto)return `<span class="tag rec">🤖 publica sozinho${p.hora?' '+esc(p.hora):''}${p.etapa!=='agendamento'?' (quando chegar em agendamento)':''}</span>`;
+  return '';
+}
+function pintarStatusPub(p,el){
+  if(!el)return;
+  const pm=podeMover(),pronto=(p.midias||[]).length||p.arquivo;
+  let h='';
+  if(p.etapa==='publicado')h=`<div class="pub-ok">✓ Publicado${p.link?` · <a href="${esc(p.link)}" target="_blank">ver post</a>`:''}</div>`;
+  else if(p.pubStatus==='erro')h=`<div class="meta-alerta"><b>Não publicou:</b> ${esc(p.pubErro)}</div>`;
+  else if(p.pubStatus==='processando'||p.pubStatus==='publicando')h='<div class="pub-info">O Instagram está processando o arquivo. Sai em alguns minutos.</div>';
+  else if(p.publicarAuto&&p.data)h=`<div class="pub-info">${p.etapa==='agendamento'?'🤖 Vai publicar sozinho':'🤖 Quando chegar em Agendamento, vai publicar sozinho'} em ${p.data.split('-').reverse().slice(0,2).join('/')}${p.hora?' às '+esc(p.hora):''}.</div>`;
+  if(p.etapa!=='publicado'&&pm&&pronto)h+=`<div class="acoes" style="margin-top:8px">${p.pubStatus==='erro'?'<button class="mini" id="pub-tentar">Tentar de novo no horário</button>':''}
+    <button class="mini" id="pub-agora">Publicar agora</button></div>`;
+  el.innerHTML=h;
+  const ta=el.querySelector('#pub-tentar');if(ta)ta.onclick=()=>tentarDeNovo(p);
+  const pa=el.querySelector('#pub-agora');if(pa)pa.onclick=()=>publicarAgora(p,pa);
+}
+async function tentarDeNovo(p){
+  p.pubStatus=null;p.pubErro='';
+  if(naNuvem){const {error}=await sb.from('postagens').update({pub_status:null,pub_erro:null}).eq('id',p.id);if(error)return aviso('Não deu: '+error.message)}
+  else localSet(dados);
+  if(p.etapa!=='agendamento')await moverPost(p,'agendamento');
+  fecharModal();redesenhar();aviso('Vai tentar de novo no horário marcado'+(momentoPost(p)<new Date()?' (já passou: sai na próxima rodada, em até 5 min)':''));
+}
+async function publicarAgora(p,bt){
+  const onde=(p.destinos||['instagram']).map(d=>d==='instagram'?'Instagram':'Facebook').join(' e ');
+  if(!confirm(`Publicar "${p.titulo}" AGORA no ${onde} de ${nomeCli(p.clienteId)}?`))return;
+  bt.disabled=true;bt.textContent='publicando…';
+  try{
+    const r=await chamarFuncao('meta',{acao:'publicar',postagemId:p.id});
+    if(naNuvem)await recarregarDaNuvem();
+    fecharModal();redesenhar();
+    aviso(r.resultado==='publicado'?'Publicado!':r.resultado==='processando'?'O Instagram está processando o vídeo; sai em alguns minutos':'Não publicou: '+(r.erro||'erro'));
+  }catch(e){aviso(e.message);bt.disabled=false;bt.textContent='Publicar agora'}
+}
+/* o Instagram só aceita imagem em JPEG: converte PNG/WebP antes de enviar */
+async function paraJpeg(f){
+  if(!/^image\/(png|webp|gif|bmp)$/.test(f.type))return f;
+  try{
+    const img=await createImageBitmap(f),cv=document.createElement('canvas');
+    cv.width=img.width;cv.height=img.height;const c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,cv.width,cv.height);c.drawImage(img,0,0);
+    const b=await new Promise(r=>cv.toBlob(r,'image/jpeg',.92));
+    return new File([b],f.name.replace(/\.\w+$/,'')+'.jpg',{type:'image/jpeg'});
+  }catch(e){return f}
+}
+/* modo demonstração: simula a publicação na hora marcada (sem Meta de verdade) */
+function publicarDemo(p){
+  const ok=(p.midias||[]).length||p.arquivo;
+  if(!ok){p.pubStatus='erro';p.pubErro='Falta o arquivo (imagem ou vídeo) para publicar. Envie pelo CRM.';return 'erro'}
+  if(!cliDe(p.clienteId).metaPaginaId){p.pubStatus='erro';p.pubErro='Cliente sem página do Facebook/Instagram ligada. Ligue na ficha, em "Anúncios".';return 'erro'}
+  p.etapa='publicado';p.pubStatus='publicado';p.pubErro='';p.publicadoEm=Date.now();p.etapaDesde=Date.now();p.link='https://instagram.com/';
+  p.eventos=[...(p.eventos||[]),{ts:new Date().toISOString(),quem:'Sistema',txt:'Publicado (simulação do modo demonstração)'}];
+  return 'publicado';
+}
+function rodadaDemo(){
+  if(naNuvem)return;
+  let mudou=false;
+  for(const p of dados.postagens||[])
+    if(p.etapa==='agendamento'&&p.publicarAuto&&!p.pubStatus&&p.data&&momentoPost(p)<=new Date()){publicarDemo(p);mudou=true}
+  if(mudou){localSet(dados);redesenhar()}
+}
+setInterval(rodadaDemo,20000);
+
 async function abrirArquivo(a){
   if(!a)return;
   if(/^https?:\/\//i.test(a))return window.open(a,'_blank','noopener');
@@ -2356,7 +2497,7 @@ async function linkAprovacao(cid){
   if(!c.token){c.token=tokenNovo();await gravar(dados)}
   const pend=postsAbertos().filter(p=>p.clienteId===cid&&p.etapa==='aprovacao');
   const url=urlAprovacao(c);
-  const txt=`Oi! Tem ${pend.length===1?'1 conteúdo':pend.length+' conteúdos'} esperando sua aprovação 😊\n\nÉ só abrir o link, ver e clicar em *Aprovar* ou *Pedir ajuste*:\n${url}\n\n— Cometa Digital`;
+  const txt=`Oi! Tem ${pend.length===1?'1 conteúdo':pend.length+' conteúdos'} esperando sua aprovação.\n\nÉ só abrir o link, ver e clicar em *Aprovar* ou *Pedir ajuste*:\n${url}\n\n— Cometa Digital`;
   const z=(c.contato||'').replace(/\D/g,'');
   abrirModal(`<h3>Aprovação · ${esc(c.nome)}</h3>
     <p style="font-size:13.5px;color:var(--suave);margin-top:-6px">Link exclusivo deste cliente. Ele vê só o que está na etapa <b>Aprovação do cliente</b> e responde por lá: aprovado vai para agendamento, ajuste volta para edição com o comentário.</p>
@@ -2376,7 +2517,7 @@ async function linkAprovacao(cid){
 
 /* ---- materiais pedidos ao cliente ---- */
 function textoCobranca(c,itens){
-  return `Oi! Tudo bem? Aqui é da Cometa 🚀\n\nPara seguirmos com o conteúdo de *${c.nome}*, ainda precisamos de:\n\n`+
+  return `Oi! Tudo bem? Aqui é da Cometa Digital.\n\nPara seguirmos com o conteúdo de *${c.nome}*, ainda precisamos de:\n\n`+
     itens.map(i=>`• ${i.descricao}${i.prazo?' (até '+i.prazo.split('-').reverse().slice(0,2).join('/')+')':''}`).join('\n')+
     `\n\nPode mandar por aqui mesmo. Obrigado!`;
 }
@@ -2912,10 +3053,10 @@ async function abrirSistema(){
       po(0,'Pão de fermentação natural','reels',-1,'edicao',{prioridade:'alta'}),po(0,'Café da manhã completo','feed',2,'aprovacao'),
       po(0,'Bastidores da padaria','stories',5,'pauta'),po(0,'Promoção de segunda','carrossel',-6,'publicado',{link:'https://instagram.com'}),
       po(1,'Treino de 15 minutos','reels',1,'captacao'),po(1,'Depoimento de aluna','video',6,'producao'),po(1,'Horários novos','arte',-3,'publicado'),
-      po(2,'Pizza saindo do forno','reels',0,'agendamento'),po(2,'Rodízio de quinta','feed',3,'revisao'),po(2,'Novo sabor do mês','carrossel',9,'pauta'),
+      po(2,'Pizza saindo do forno','reels',0,'agendamento',{publicarAuto:true,destinos:['instagram','facebook'],midias:['demo:pizza.mp4'],hora:'23:50'}),po(2,'Rodízio de quinta','feed',3,'revisao'),po(2,'Novo sabor do mês','carrossel',9,'pauta'),
       po(3,'Óculos de sol: tendências','carrossel',4,'aprovacao',{aprovacao:'ajustes',aprovacaoComentario:'Trocar a foto da capa por uma com modelo.'}),
       po(4,'Banho e tosa: antes e depois','reels',7,'captacao'),po(5,'Clareamento: perguntas comuns','carrossel',2,'edicao'),
-      po(6,'Combo da semana','feed',-2,'aprovacao'),po(7,'Coleção de verão','reels',11,'pauta'),po(5,'Equipe da clínica','feed',-8,'publicado')];
+      po(6,'Combo da semana','feed',-2,'aprovacao'),po(1,'Aula experimental grátis','feed',1,'agendamento',{publicarAuto:true,midias:['demo:aula.jpg'],hora:'12:00'}),po(7,'Coleção de verão','reels',11,'pauta'),po(5,'Equipe da clínica','feed',-8,'publicado')];
     dados.materiais=[
       {id:uid(),clienteId:'demo0',descricao:'Fotos dos produtos novos',prazo:h(-2),pedidoEm:Date.now()-5*864e5,recebidoEm:null,ultimoLembrete:null,lembretes:1},
       {id:uid(),clienteId:'demo6',descricao:'Preço do combo da semana',prazo:h(1),pedidoEm:Date.now()-864e5,recebidoEm:null,ultimoLembrete:null,lembretes:0},
